@@ -99,8 +99,9 @@ export class InputManager {
 
   /** Recompute drag sensitivity from the current viewport width. */
   updateDragRange(): void {
-    // Shorter drag distance to reach full steer => more responsive touch feel.
-    this.dragRange = Math.max(70, Math.min(150, window.innerWidth * 0.16));
+    // Short drag distance to reach full steer => a small flick fully deflects,
+    // for a snappy, responsive touch feel.
+    this.dragRange = Math.max(55, Math.min(120, window.innerWidth * 0.13));
   }
 
   /** Call once per frame to compute the current steer value. */

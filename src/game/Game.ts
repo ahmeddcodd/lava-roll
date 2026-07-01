@@ -217,6 +217,9 @@ export class Game {
 
   private beginPlaying(): void {
     this.state = GameState.Playing;
+    // The player has started steering — the hint has served its purpose.
+    this.ui.showTutorial(false);
+    this.tutorialTimer = 0;
     this.audio.startMusic();
     this.audio.liftMusic();
   }

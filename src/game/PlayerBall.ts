@@ -99,19 +99,26 @@ export class PlayerBall {
    * and visual rolling. Y is set externally from the track height.
    */
   update(dt: number, steerX: number, speed: number): void {
-    const targetVX = steerX * GameConfig.player.steerSpeed;
-    // Frame-rate independent smoothing: reach the target quickly and consistently
-    // regardless of FPS. Higher steerResponse = snappier steering.
-    const t = 1 - Math.exp(-GameConfig.player.steerResponse * dt);
-    this.velocityX = Scalar.Lerp(this.velocityX, targetVX, t);
-
     this.pivot.position.z += speed * dt;
-    this.pivot.position.x += this.velocityX * dt;
+
+    // Position-targeted steering: the ball darts toward where the input points
+    // rather than accelerating a velocity, so it feels snappy, not lazy. The
+    // target maps the [-1,1] steer directly onto the drivable lateral range.
+    const prevX = this.pivot.position.x;
+    const targetX = steerX * LATERAL_LIMIT;
+    // Frame-rate independent smoothing toward the target; but cap the per-frame
+    // move by steerSpeed so it can't teleport at very low FPS.
+    const t = 1 - Math.exp(-GameConfig.player.steerResponse * dt);
+    let newX = Scalar.Lerp(prevX, targetX, t);
+    const maxMove = GameConfig.player.steerSpeed * dt;
+    newX = Math.max(prevX - maxMove, Math.min(prevX + maxMove, newX));
 
     // Clamp lateral range to the track (soft — falling handled separately).
     const limit = LATERAL_LIMIT + 0.6; // allow a little overshoot for the fall
-    if (this.pivot.position.x > limit) this.pivot.position.x = limit;
-    if (this.pivot.position.x < -limit) this.pivot.position.x = -limit;
+    this.pivot.position.x = Math.max(-limit, Math.min(limit, newX));
+
+    // Actual lateral velocity this frame drives the roll-tilt visual.
+    this.velocityX = dt > 0 ? (this.pivot.position.x - prevX) / dt : 0;
 
     // Visual rolling to sell the effect (on the child mesh, not the pivot).
     this.mesh.rotation.x += speed * dt * GameConfig.player.rollVisualMultiplier;

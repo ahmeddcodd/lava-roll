@@ -36,28 +36,33 @@ export class UIManager {
     hud.innerHTML = `
       <div id="hud-flash"></div>
       <div class="hud-top">
-        <div class="hud-stat">
+        <div class="hud-pill hud-stat">
           <span class="hud-stat-label">${labels.distance}</span>
           <span class="hud-stat-value" id="hud-distance">0</span>
         </div>
-        <div class="hud-stat right">
+        <button id="hud-mute" type="button" aria-label="Toggle sound">&#128266;</button>
+        <div class="hud-pill hud-stat right">
           <span class="hud-stat-label" id="hud-coins-label">${labels.collectible}</span>
           <span class="hud-stat-value" id="hud-coins">0</span>
         </div>
       </div>
-      <button id="hud-mute" type="button" aria-label="Toggle sound">&#128266;</button>
       <div id="hud-message"></div>
-      <div id="hud-tutorial">${labels.tutorial}<span class="arrows">&#8592;&nbsp;&#8594;</span></div>
+      <div id="hud-tutorial">
+        <span class="tut-text">${labels.tutorial}</span>
+        <span class="arrows">&#8592;&nbsp;&#8594;</span>
+      </div>
       <div id="hud-paused">${labels.paused}</div>
       <div id="hud-panel">
-        <div class="panel-title">${labels.gameOver}</div>
-        <div class="panel-newbest" id="hud-newbest"></div>
-        <div class="panel-stats">
-          <div class="panel-row"><span class="label">${labels.distance}</span><span class="value" id="hud-panel-distance">0</span></div>
-          <div class="panel-row"><span class="label">${labels.collectible}</span><span class="value" id="hud-panel-coins">0</span></div>
-          <div class="panel-row"><span class="label">Best</span><span class="value" id="hud-panel-best">0</span></div>
+        <div class="panel-card">
+          <div class="panel-title">${labels.gameOver}</div>
+          <div class="panel-newbest" id="hud-newbest"></div>
+          <div class="panel-stats">
+            <div class="panel-row"><span class="label">${labels.distance}</span><span class="value" id="hud-panel-distance">0</span></div>
+            <div class="panel-row"><span class="label">${labels.collectible}</span><span class="value" id="hud-panel-coins">0</span></div>
+            <div class="panel-row"><span class="label">Best</span><span class="value" id="hud-panel-best">0</span></div>
+          </div>
+          <button id="retry-btn" type="button">${labels.retry}</button>
         </div>
-        <button id="retry-btn" type="button">${labels.retry}</button>
       </div>
     `;
 
