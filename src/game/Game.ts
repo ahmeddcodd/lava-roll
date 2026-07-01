@@ -76,8 +76,10 @@ export class Game {
   constructor(canvas: HTMLCanvasElement, hud: HTMLElement) {
     this.isMobile = detectMobile();
 
-    this.engine = new Engine(canvas, !this.isMobile, {
-      adaptToDeviceRatio: true,
+    this.engine = new Engine(canvas, GameConfig.performance.antialias, {
+      // Resolution is controlled explicitly via setHardwareScalingLevel (below),
+      // so we don't let the engine also apply the raw device ratio (double-apply).
+      adaptToDeviceRatio: false,
       preserveDrawingBuffer: false,
       stencil: false,
       powerPreference: "high-performance",
@@ -447,6 +449,9 @@ export class Game {
   }
 
   private onResize(): void {
+    // Re-apply DPR-capped resolution first (DPR can change across displays),
+    // then resize the engine so the backbuffer matches the new sharp target.
+    this.sceneMgr.applyPerformanceSettings(this.engine, this.isMobile);
     this.engine.resize();
     this.input.updateDragRange();
     const aspect = this.engine.getRenderWidth() / this.engine.getRenderHeight();

@@ -127,12 +127,19 @@ export class SceneManager {
     return m;
   }
 
+  /**
+   * Set render resolution from the device pixel ratio, capped for performance.
+   * hardwareScalingLevel = 1 / effectiveDPR: a value < 1 renders ABOVE CSS
+   * resolution (crisp on high-DPI phones). Called on init and on resize so the
+   * canvas stays sharp after rotation / viewport changes.
+   */
   applyPerformanceSettings(engine: Engine, isMobile: boolean): void {
-    engine.setHardwareScalingLevel(
-      isMobile
-        ? GameConfig.performance.mobileHardwareScaling
-        : GameConfig.performance.desktopHardwareScaling
-    );
+    const cap = isMobile
+      ? GameConfig.performance.maxMobilePixelRatio
+      : GameConfig.performance.maxDesktopPixelRatio;
+    const dpr = window.devicePixelRatio || 1;
+    const effectiveDpr = Math.min(dpr, cap);
+    engine.setHardwareScalingLevel(1 / effectiveDpr);
   }
 
   dispose(): void {

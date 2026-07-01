@@ -11,9 +11,13 @@ export const GameConfig = {
   },
 
   performance: {
-    // Applied via engine.setHardwareScalingLevel on mobile (higher = lower res).
-    mobileHardwareScaling: 1.5,
-    desktopHardwareScaling: 1.0,
+    // Crispness cap: render at the device pixel ratio, but never above this
+    // multiple of CSS pixels. Keeps phones sharp while avoiding a 3x render on
+    // ultra-HD screens (which would tank FPS). 1 = CSS-resolution only.
+    maxMobilePixelRatio: 2,
+    maxDesktopPixelRatio: 2,
+    // Antialiasing smooths edges — enabled on all devices now (big clarity win).
+    antialias: true,
     shadowsEnabled: false,
     bloomEnabled: false,
     maxParticlesMobile: 80,
