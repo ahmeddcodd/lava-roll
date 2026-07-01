@@ -3,11 +3,23 @@ import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTextur
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import { Mesh } from "@babylonjs/core/Meshes/mesh";
+import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import type { Scene } from "@babylonjs/core/scene";
 
 import { GameConfig } from "./Config";
 import { ThemeConfig } from "./ThemeConfig";
+import { hexToColor3 } from "./SceneManager";
 import type { PlayerBall } from "./PlayerBall";
+
+interface Ring {
+  mesh: Mesh;
+  mat: StandardMaterial;
+  life: number; // remaining seconds
+  maxLife: number;
+  active: boolean;
+}
 
 /**
  * Lightweight fake-glow effects (design doc §17): a ball trail, low-count embers,
@@ -22,6 +34,9 @@ export class EffectsManager {
   private readonly trail: ParticleSystem;
   private readonly embers: ParticleSystem;
   private readonly burst: ParticleSystem;
+
+  // Pooled expanding glow rings (pickup / landing pops).
+  private readonly rings: Ring[] = [];
 
   private readonly maxParticles: number;
 
@@ -42,6 +57,60 @@ export class EffectsManager {
     this.trail = this.makeTrail();
     this.embers = this.makeEmbers();
     this.burst = this.makeBurst();
+    this.makeRingPool();
+  }
+
+  private makeRingPool(): void {
+    for (let i = 0; i < 6; i++) {
+      const mesh = MeshBuilder.CreateTorus(
+        `fxRing${i}`,
+        { diameter: 1, thickness: 0.12, tessellation: 20 },
+        this.scene
+      );
+      mesh.rotation.x = Math.PI / 2; // lie flat, facing up
+      mesh.isPickable = false;
+      mesh.setEnabled(false);
+      const mat = new StandardMaterial(`fxRingMat${i}`, this.scene);
+      mat.disableLighting = true;
+      mat.emissiveColor = hexToColor3(ThemeConfig.gameplay.trailColor);
+      mat.alpha = 1;
+      mat.backFaceCulling = false;
+      mesh.material = mat;
+      this.rings.push({ mesh, mat, life: 0, maxLife: 0.4, active: false });
+    }
+  }
+
+  /** Emit an expanding glow ring at a world position. */
+  ring(pos: Vector3, kind: "gold" | "trail" = "trail"): void {
+    const r = this.rings.find((x) => !x.active);
+    if (!r) return;
+    const hex =
+      kind === "gold"
+        ? ThemeConfig.colors.collectible
+        : ThemeConfig.gameplay.trailColor;
+    r.mat.emissiveColor = hexToColor3(hex);
+    r.mesh.position.copyFrom(pos);
+    r.mesh.scaling.set(0.3, 0.3, 0.3);
+    r.mat.alpha = 0.9;
+    r.life = r.maxLife;
+    r.active = true;
+    r.mesh.setEnabled(true);
+  }
+
+  private updateRings(dt: number): void {
+    for (const r of this.rings) {
+      if (!r.active) continue;
+      r.life -= dt;
+      if (r.life <= 0) {
+        r.active = false;
+        r.mesh.setEnabled(false);
+        continue;
+      }
+      const t = 1 - r.life / r.maxLife; // 0..1
+      const s = 0.3 + t * 3.2; // expand outward
+      r.mesh.scaling.set(s, s, s);
+      r.mat.alpha = 0.9 * (1 - t); // fade out
+    }
   }
 
   private makeSoftDotTexture(): DynamicTexture {
@@ -166,9 +235,10 @@ export class EffectsManager {
     this.embers.reset();
   }
 
-  /** Keep the trail/ember emitter following the ball. */
-  update(ball: PlayerBall): void {
+  /** Keep the trail/ember emitter following the ball; animate rings. */
+  update(ball: PlayerBall, dt = 0): void {
     this.emitterNode.position.copyFrom(ball.position);
+    if (dt > 0) this.updateRings(dt);
   }
 
   /** One-shot collect burst at a world position. */
@@ -191,6 +261,10 @@ export class EffectsManager {
     this.trail.dispose();
     this.embers.dispose();
     this.burst.dispose();
+    for (const r of this.rings) {
+      r.mesh.dispose();
+      r.mat.dispose();
+    }
     this.softDot.dispose();
     this.emitterNode.dispose();
   }

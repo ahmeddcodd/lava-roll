@@ -99,20 +99,20 @@ export class InputManager {
 
   /** Recompute drag sensitivity from the current viewport width. */
   updateDragRange(): void {
-    this.dragRange = Math.max(90, Math.min(220, window.innerWidth * 0.22));
+    // Shorter drag distance to reach full steer => more responsive touch feel.
+    this.dragRange = Math.max(70, Math.min(150, window.innerWidth * 0.16));
   }
 
-  /** Call once per frame to advance the smoothed steer value. */
+  /** Call once per frame to compute the current steer value. */
   update(): void {
-    // Keyboard overrides pointer when held.
-    let target = this.rawSteer;
+    // Keyboard overrides pointer when held (instant, full deflection).
     const left = this.keys.has("a") || this.keys.has("arrowleft");
     const right = this.keys.has("d") || this.keys.has("arrowright");
-    if (left && !right) target = -1;
-    else if (right && !left) target = 1;
-
-    // Light smoothing to remove jitter; the ball applies its own steerLerp too.
-    this.steerX += (target - this.steerX) * 0.5;
+    if (left && !right) this.steerX = -1;
+    else if (right && !left) this.steerX = 1;
+    // Pointer drag is already smoothed by the raw delta; pass it straight through
+    // so the only steering smoothing is the ball's frame-rate-independent lerp.
+    else this.steerX = this.rawSteer;
   }
 
   /** Clears held input; used on state transitions. */

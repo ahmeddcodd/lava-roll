@@ -49,6 +49,7 @@ export class CollectibleSystem {
     if (!c) return;
     c.mesh.position.set(x, y, z);
     c.mesh.rotation.set(0, Math.random() * Math.PI, 0);
+    c.mesh.scaling.set(1, 1, 1);
     c.mesh.setEnabled(true);
     c.mesh.isVisible = true;
     c.active = true;
@@ -67,12 +68,17 @@ export class CollectibleSystem {
     c.mesh.setEnabled(false);
   }
 
-  /** Spin animation + recycle anything far behind the ball. */
+  /** Spin animation, approach scale-pop, and recycle behind the ball. */
   update(dt: number, ballZ: number): void {
     const spin = dt * 2.2;
     for (const c of this.pool) {
       if (!c.active) continue;
       c.mesh.rotation.y += spin;
+      // Scale-pop anticipation: swell as the ball approaches (within ~5 units).
+      const dz = c.mesh.position.z - ballZ;
+      const near = Math.max(0, 1 - Math.abs(dz) / 5);
+      const s = 1 + near * 0.5;
+      c.mesh.scaling.set(s, s, s);
       if (c.mesh.position.z < ballZ - 12) this.release(c);
     }
   }

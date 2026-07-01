@@ -1,5 +1,6 @@
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
@@ -16,6 +17,9 @@ import { ThemeConfig } from "./ThemeConfig";
  * arcade movement — no physics.
  */
 export class PlayerBall {
+  /** Positioned/scaled root (world-axis). Movement + squash live here. */
+  readonly pivot: TransformNode;
+  /** Rolling sphere mesh (child of pivot); only its rotation changes. */
   readonly mesh: Mesh;
   readonly radius = GameConfig.player.radius;
 
@@ -25,18 +29,26 @@ export class PlayerBall {
   private readonly rings: Mesh[] = [];
   private readonly glow: Mesh;
 
+  // Squash & stretch: 0 = neutral. Positive = stretch (tall), negative = squash
+  // (flat). Eases back to 0 each frame for springy game feel.
+  private squash = 0;
+
   constructor(
     scene: Scene,
     stoneMat: StandardMaterial,
     crackMat: StandardMaterial
   ) {
+    this.pivot = new TransformNode("ballPivot", scene);
+    this.pivot.position.set(0, this.radius, 0);
+
     this.mesh = MeshBuilder.CreateSphere(
       "ball",
       { diameter: this.radius * 2, segments: 16 },
       scene
     );
     this.mesh.material = stoneMat;
-    this.mesh.position.set(0, this.radius, 0);
+    this.mesh.parent = this.pivot;
+    this.mesh.position.set(0, 0, 0);
 
     // Emissive crack rings at varied orientations, parented to the ball.
     const ringDiameter = this.radius * 2.02;
@@ -79,7 +91,7 @@ export class PlayerBall {
   }
 
   get position(): Vector3 {
-    return this.mesh.position;
+    return this.pivot.position;
   }
 
   /**
@@ -88,23 +100,43 @@ export class PlayerBall {
    */
   update(dt: number, steerX: number, speed: number): void {
     const targetVX = steerX * GameConfig.player.steerSpeed;
-    this.velocityX = Scalar.Lerp(
-      this.velocityX,
-      targetVX,
-      GameConfig.player.steerLerp
-    );
+    // Frame-rate independent smoothing: reach the target quickly and consistently
+    // regardless of FPS. Higher steerResponse = snappier steering.
+    const t = 1 - Math.exp(-GameConfig.player.steerResponse * dt);
+    this.velocityX = Scalar.Lerp(this.velocityX, targetVX, t);
 
-    this.mesh.position.z += speed * dt;
-    this.mesh.position.x += this.velocityX * dt;
+    this.pivot.position.z += speed * dt;
+    this.pivot.position.x += this.velocityX * dt;
 
     // Clamp lateral range to the track (soft — falling handled separately).
     const limit = LATERAL_LIMIT + 0.6; // allow a little overshoot for the fall
-    if (this.mesh.position.x > limit) this.mesh.position.x = limit;
-    if (this.mesh.position.x < -limit) this.mesh.position.x = -limit;
+    if (this.pivot.position.x > limit) this.pivot.position.x = limit;
+    if (this.pivot.position.x < -limit) this.pivot.position.x = -limit;
 
-    // Visual rolling to sell the effect.
+    // Visual rolling to sell the effect (on the child mesh, not the pivot).
     this.mesh.rotation.x += speed * dt * GameConfig.player.rollVisualMultiplier;
     this.mesh.rotation.z -= this.velocityX * dt * 0.3;
+
+    this.updateSquash(dt);
+  }
+
+  /** Ease squash back to neutral and apply it as world-axis pivot scaling. */
+  private updateSquash(dt: number): void {
+    // Spring back toward 0 (neutral) with frame-rate-independent damping.
+    this.squash = Scalar.Lerp(this.squash, 0, 1 - Math.exp(-12 * dt));
+    // Positive squash => taller + thinner (stretch); negative => flat + wide.
+    const sy = 1 + this.squash;
+    const sxz = 1 - this.squash * 0.5;
+    this.pivot.scaling.set(sxz, sy, sxz);
+  }
+
+  /** Trigger a squash/stretch impulse. +ve = stretch, -ve = squash. */
+  private pokeSquash(amount: number): void {
+    this.squash = amount;
+    // Apply immediately so the very next render shows it (snappy).
+    const sy = 1 + this.squash;
+    const sxz = 1 - this.squash * 0.5;
+    this.pivot.scaling.set(sxz, sy, sxz);
   }
 
   get airborne(): boolean {
@@ -118,7 +150,12 @@ export class PlayerBall {
 
   /** Snap the ball onto the ground surface and clear vertical motion. */
   stickToGround(groundSurfaceY: number): void {
-    this.mesh.position.y = groundSurfaceY + this.radius;
+    // Squash impulse on the landing transition (impact scales with fall speed).
+    if (this._airborne) {
+      const impact = Math.min(0.35, 0.12 + Math.abs(this.velocityY) * 0.02);
+      this.pokeSquash(-impact);
+    }
+    this.pivot.position.y = groundSurfaceY + this.radius;
     this.velocityY = 0;
     this._airborne = false;
   }
@@ -131,29 +168,32 @@ export class PlayerBall {
     if (this._airborne) return;
     this._airborne = true;
     this.velocityY = upwardVelocity;
+    this.pokeSquash(0.28); // stretch upward as it leaps
   }
 
   /** Integrate the airborne arc (gravity). Call each frame while airborne. */
   integrateAir(dt: number): void {
     this.velocityY -= GameConfig.player.jump.gravity * dt;
-    this.mesh.position.y += this.velocityY * dt;
+    this.pivot.position.y += this.velocityY * dt;
   }
 
   /** Free-fall used during the Falling state. */
   applyFall(dt: number, fallVelocity: number): void {
-    this.mesh.position.y -= fallVelocity * dt;
+    this.pivot.position.y -= fallVelocity * dt;
     this.mesh.rotation.x += dt * 4;
   }
 
   setY(y: number): void {
-    this.mesh.position.y = y;
+    this.pivot.position.y = y;
   }
 
   reset(): void {
-    this.mesh.position.set(0, this.radius, 0);
+    this.pivot.position.set(0, this.radius, 0);
+    this.pivot.scaling.set(1, 1, 1);
     this.mesh.rotation.set(0, 0, 0);
     this.velocityX = 0;
     this.velocityY = 0;
     this._airborne = false;
+    this.squash = 0;
   }
 }

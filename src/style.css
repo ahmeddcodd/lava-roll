@@ -277,3 +277,96 @@ body {
 #hud-paused.show {
   opacity: 1;
 }
+
+/* --- Juice: HUD stat punch-scale on change --- */
+.hud-stat-value.pop {
+  animation: statpop 0.28s ease-out;
+}
+
+@keyframes statpop {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.35);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* --- Juice: full-screen impact flash --- */
+#hud-flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 5;
+}
+
+#hud-flash.flash-red {
+  animation: flashfade 0.4s ease-out;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(255, 30, 0, 0) 30%,
+    rgba(255, 30, 0, 0.55) 100%
+  );
+}
+
+#hud-flash.flash-gold {
+  animation: flashfade 0.5s ease-out;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(255, 200, 60, 0.28),
+    rgba(255, 160, 0, 0) 70%
+  );
+}
+
+#hud-flash.flash-cyan {
+  animation: flashfade 0.35s ease-out;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(120, 240, 255, 0) 40%,
+    rgba(120, 240, 255, 0.4) 100%
+  );
+}
+
+@keyframes flashfade {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* --- Mute toggle button (top area, offset from coins) --- */
+#hud-mute {
+  position: absolute;
+  top: calc(clamp(10px, 2.5vh, 28px) + clamp(46px, 8vh, 70px));
+  right: clamp(14px, 4vw, 40px);
+  width: clamp(38px, 8vw, 52px);
+  height: clamp(38px, 8vw, 52px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(18px, 3.6vh, 26px);
+  line-height: 1;
+  border: 1px solid rgba(255, 160, 60, 0.35);
+  border-radius: 50%;
+  background: var(--ui-bg-panel);
+  color: var(--ui-text);
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: 11;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.08s ease, opacity 0.2s ease;
+}
+
+#hud-mute:active {
+  transform: scale(0.9);
+}
+
+#hud-mute.muted {
+  opacity: 0.55;
+}

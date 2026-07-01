@@ -25,6 +25,7 @@ import { EffectsManager } from "./EffectsManager";
 import { Environment } from "./Environment";
 import { UIManager } from "./UIManager";
 import { SaveManager } from "./SaveManager";
+import { AudioManager } from "./AudioManager";
 import { ThemeConfig } from "./ThemeConfig";
 
 const MAX_DT = 1 / 20; // clamp delta to avoid spiral-of-death on tab return
@@ -50,8 +51,12 @@ export class Game {
   private readonly environment: Environment;
   private readonly ui: UIManager;
   private readonly save: SaveManager;
+  private readonly audio: AudioManager;
 
   private state: GameState = GameState.Boot;
+
+  // Juice: hit-stop timer freezes simulation briefly for impact.
+  private hitStopTimer = 0;
 
   // Run state.
   private speed: number = GameConfig.player.startSpeed;
@@ -112,23 +117,41 @@ export class Game {
     this.environment = new Environment(scene, this.sceneMgr);
     this.ui = new UIManager(hud);
     this.save = new SaveManager();
+    this.audio = new AudioManager();
 
     this.wireEvents();
   }
 
   private wireEvents(): void {
-    // Collect burst + score on pickup.
+    // Collect burst + ring + SFX on pickup (combo climbs the collect pitch).
     this.collectibles.onCollect = (pos: Vector3) => {
       this.effects.collectBurst(pos);
+      this.effects.ring(pos, "gold");
+      this.audio.collect(this.coins);
+      this.ui.pop("coins");
     };
 
-    // First input starts the run.
+    // First input starts the run and unlocks audio (needs a user gesture).
     this.input.onFirstInput = () => {
+      this.audio.resume();
+      this.audio.tap();
       if (this.state === GameState.Ready) this.beginPlaying();
     };
 
     // Retry from the game-over panel.
-    this.ui.onRetry = () => this.restart();
+    this.ui.onRetry = () => {
+      this.audio.resume();
+      this.audio.tap();
+      this.restart();
+    };
+
+    // Mute toggle from the HUD.
+    this.ui.onToggleMute = () => {
+      this.audio.resume();
+      const muted = this.audio.toggleMute();
+      this.ui.setMuted(muted);
+    };
+    this.ui.setMuted(this.audio.isMuted);
 
     // Resize: keep the run going, just re-fit engine + camera framing.
     window.addEventListener("resize", () => this.onResize());
@@ -154,6 +177,13 @@ export class Game {
     let dt = (now - this.lastTime) / 1000;
     this.lastTime = now;
     if (dt > MAX_DT) dt = MAX_DT; // clamp spikes (tab return, GC hitch)
+
+    // Hit-stop: briefly freeze the simulation for impact, but keep rendering.
+    if (this.hitStopTimer > 0) {
+      this.hitStopTimer -= dt;
+      this.sceneMgr.scene.render();
+      return;
+    }
 
     switch (this.state) {
       case GameState.Ready:
@@ -185,6 +215,8 @@ export class Game {
 
   private beginPlaying(): void {
     this.state = GameState.Playing;
+    this.audio.startMusic();
+    this.audio.liftMusic();
   }
 
   private restart(): void {
@@ -196,6 +228,7 @@ export class Game {
     if (this.state === GameState.Playing || this.state === GameState.Falling) {
       this.state = GameState.Paused;
       this.ui.showPaused(true);
+      this.audio.duckMusic();
     }
   }
 
@@ -205,6 +238,7 @@ export class Game {
       this.lastTime = performance.now();
       this.state = GameState.Playing;
       this.ui.showPaused(false);
+      this.audio.liftMusic();
     }
   }
 
@@ -218,6 +252,7 @@ export class Game {
     this.fallTimer = 0;
     this.airTimer = 0;
     this.boostTimer = 0;
+    this.hitStopTimer = 0;
     this.nextSpeedUpDistance = GameConfig.scoring.speedUpIntervalDistance;
 
     this.ball.reset();
@@ -238,7 +273,7 @@ export class Game {
     // Ball idles gently; scenery + effects animate. Roll slowly for life.
     this.ball.update(dt, 0, 0);
     this.ball.stickToGround(this.track.getTrackHeightAt(this.ball.position.z));
-    this.effects.update(this.ball);
+    this.effects.update(this.ball, dt);
     this.camera.update(this.ball, dt, this.speed);
 
     if (this.tutorialTimer > 0) {
@@ -267,7 +302,7 @@ export class Game {
     this.obstacles.update(dt, this.ball.position.z);
     this.collectibles.update(dt, this.ball.position.z);
     this.environment.update(this.ball.position.z);
-    this.effects.update(this.ball);
+    this.effects.update(this.ball, dt);
 
     // Collisions / falling / near-miss.
     const res = this.collisions.check(this.ball);
@@ -278,9 +313,14 @@ export class Game {
     if (res.nearMiss) {
       this.score += GameConfig.scoring.nearMissValue;
       this.ui.flashMessage(ThemeConfig.labels.closeCall, 0.8);
+      this.ui.flash("cyan");
+      this.audio.closeCall();
     }
     if (res.hitObstacle) {
-      this.camera.shake(0.35, 0.35);
+      this.camera.shake(0.5, 0.4);
+      this.ui.flash("red");
+      this.audio.hit();
+      this.hitStop(0.09);
       this.startFalling();
       return;
     }
@@ -315,6 +355,8 @@ export class Game {
         this.ball.stickToGround(groundSurfaceY);
         this.airTimer = 0;
         this.camera.shake(0.18, 0.22);
+        this.audio.land();
+        this.effects.ring(this.ball.position, "trail");
       } else if (droppedTooFar || this.airTimer > jump.maxAirTime) {
         // Missed the landing (real hole / overshoot) — lethal.
         this.startFalling();
@@ -337,6 +379,7 @@ export class Game {
       const v0 = Math.max(jump.launchBoost, (jump.gravity * airTime) / 2);
       this.ball.launch(v0);
       this.airTimer = 0;
+      this.audio.jump();
     }
 
     // Scoring / speed-up milestones.
@@ -350,15 +393,26 @@ export class Game {
       this.onSpeedUp();
     }
 
+    // Feed normalized speed to the music so it rises with velocity.
+    const speedNorm =
+      (this.speed - GameConfig.player.startSpeed) /
+      (GameConfig.player.maxSpeed - GameConfig.player.startSpeed);
+    this.audio.setIntensity(speedNorm);
+
     this.camera.update(this.ball, dt, this.speed);
     this.ui.update(this.distance, this.coins, dt);
+  }
+
+  /** Freeze the simulation briefly for impact (keeps rendering). */
+  private hitStop(seconds: number): void {
+    this.hitStopTimer = Math.max(this.hitStopTimer, seconds);
   }
 
   private updateFalling(dt: number): void {
     this.fallTimer += dt;
     this.ball.applyFall(dt, 9 + this.fallTimer * 8);
     this.camera.update(this.ball, dt, this.speed);
-    this.effects.update(this.ball);
+    this.effects.update(this.ball, dt);
     if (this.fallTimer >= GameConfig.gameplay.fallDelaySeconds) {
       this.endGame();
     }
@@ -369,12 +423,17 @@ export class Game {
     this.state = GameState.Falling;
     this.fallTimer = 0;
     this.effects.stopAmbient();
+    this.audio.fall();
+    this.audio.duckMusic();
   }
 
   private onSpeedUp(): void {
     this.ui.flashMessage(ThemeConfig.labels.speedUp, 1.0);
+    this.ui.flash("gold");
+    this.ui.pop("distance");
     this.camera.pulseFov();
     this.effects.speedPulse();
+    this.audio.speedUp();
   }
 
   private endGame(): void {
@@ -382,6 +441,9 @@ export class Game {
     const finalScore = Math.max(this.score, this.distance);
     const isNewBest = this.save.submit(finalScore);
     this.ui.showGameOver(finalScore, this.coins, this.save.best, isNewBest);
+    this.audio.duckMusic();
+    if (isNewBest) this.audio.newBest();
+    else this.audio.gameOver();
   }
 
   private onResize(): void {
@@ -394,6 +456,7 @@ export class Game {
   dispose(): void {
     this.input.dispose();
     this.effects.dispose();
+    this.audio.dispose();
     this.sceneMgr.dispose();
     this.engine.dispose();
   }

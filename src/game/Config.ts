@@ -26,8 +26,10 @@ export const GameConfig = {
     startSpeed: 16,
     acceleration: 0.35, // per second
     maxSpeed: 42,
-    steerSpeed: 12,
-    steerLerp: 0.18,
+    steerSpeed: 16,
+    // Steering responsiveness (per-second exponential smoothing rate). Higher =
+    // snappier/less lag. ~18 reaches the target lateral speed in ~150ms.
+    steerResponse: 18,
     rollVisualMultiplier: 0.55,
     // Jump/air physics for coasting across gaps (values in world units).
     jump: {
