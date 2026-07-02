@@ -1,3 +1,13 @@
+/* Bundled display font — chunky, rounded, arcade (self-hosted, no external
+   requests). Single variable woff2 (~29KB) covers all weights we use. */
+@font-face {
+  font-family: "Fredoka";
+  src: url("./assets/fonts/fredoka-latin.woff2") format("woff2");
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   /* Theme colors are injected at runtime from ThemeConfig via CSS variables. */
   --ui-main: #ffb347;
@@ -5,6 +15,9 @@
   --ui-bg-panel: rgba(12, 6, 5, 0.82);
   --ui-danger: #ff1f00;
   --ui-gold: #ffd447;
+
+  /* Font stack: bundled Fredoka first, graceful system fallback. */
+  --ui-font: "Fredoka", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
 }
 
 * {
@@ -24,7 +37,7 @@ body {
   -webkit-user-select: none;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
-  font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--ui-font);
 }
 
 #app {
@@ -75,21 +88,22 @@ body {
 .hud-pill {
   background: linear-gradient(
     180deg,
-    rgba(20, 10, 8, 0.55),
-    rgba(8, 4, 4, 0.72)
+    rgba(26, 13, 10, 0.6),
+    rgba(8, 4, 4, 0.78)
   );
-  border: 1px solid rgba(255, 160, 60, 0.22);
-  border-radius: 16px;
-  padding: clamp(6px, 1.1vh, 12px) clamp(12px, 3vw, 20px);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 170, 70, 0.28);
+  border-radius: 18px;
+  padding: clamp(7px, 1.2vh, 13px) clamp(14px, 3.2vw, 22px);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 210, 150, 0.12);
 }
 
 .hud-stat {
   display: flex;
   flex-direction: column;
-  line-height: 1.05;
+  line-height: 1;
   min-width: 0;
 }
 
@@ -100,22 +114,25 @@ body {
 
 .hud-stat-label {
   font-size: clamp(9px, 1.5vh, 14px);
-  letter-spacing: 0.14em;
+  font-weight: 600;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  opacity: 0.7;
-  margin-bottom: 0.3em;
+  opacity: 0.68;
+  margin-bottom: 0.35em;
 }
 
 .hud-stat-value {
-  font-size: clamp(22px, 4.4vh, 42px);
-  font-weight: 800;
+  font-size: clamp(24px, 4.6vh, 44px);
+  font-weight: 700;
   color: var(--ui-main);
   transform-origin: left center;
+  text-shadow: 0 0 16px rgba(255, 140, 30, 0.45), 0 2px 4px rgba(0, 0, 0, 0.6);
 }
 
 .hud-stat.right .hud-stat-value {
   color: var(--ui-gold);
   transform-origin: right center;
+  text-shadow: 0 0 16px rgba(255, 200, 60, 0.5), 0 2px 4px rgba(0, 0, 0, 0.6);
 }
 
 /* Center transient message ("SPEED UP!", "CLOSE CALL!"). Sits below the top
@@ -125,12 +142,12 @@ body {
   top: clamp(96px, 18vh, 200px);
   left: 50%;
   transform: translateX(-50%) scale(0.7);
-  font-size: clamp(22px, 5.2vh, 52px);
-  font-weight: 900;
-  letter-spacing: 0.06em;
+  font-size: clamp(24px, 5.6vh, 56px);
+  font-weight: 700;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--ui-gold);
-  text-shadow: 0 0 18px rgba(255, 130, 0, 0.85), 0 3px 8px rgba(0, 0, 0, 0.9);
+  text-shadow: 0 0 22px rgba(255, 140, 20, 0.9), 0 3px 8px rgba(0, 0, 0, 0.9);
   opacity: 0;
   white-space: nowrap;
   transition: opacity 0.18s ease, transform 0.18s ease;
@@ -161,14 +178,17 @@ body {
 
 #hud-tutorial .tut-text {
   display: inline-block;
-  padding: clamp(8px, 1.4vh, 14px) clamp(16px, 4vw, 26px);
+  padding: clamp(9px, 1.5vh, 15px) clamp(18px, 4.2vw, 28px);
   font-size: clamp(18px, 3.4vh, 32px);
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ui-text);
-  background: rgba(8, 4, 4, 0.5);
-  border-radius: 14px;
+  background: rgba(10, 5, 5, 0.55);
+  border: 1px solid rgba(255, 170, 70, 0.2);
+  border-radius: 16px;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
 }
 
@@ -224,35 +244,36 @@ body {
   align-items: center;
   gap: clamp(8px, 1.6vh, 18px);
   width: min(86vw, 440px);
-  padding: clamp(20px, 4vh, 40px) clamp(18px, 5vw, 34px);
+  padding: clamp(22px, 4.2vh, 42px) clamp(18px, 5vw, 34px);
   background: linear-gradient(
     180deg,
-    rgba(28, 14, 10, 0.92),
-    rgba(10, 5, 5, 0.95)
+    rgba(34, 17, 12, 0.94),
+    rgba(9, 4, 4, 0.96)
   );
-  border: 1px solid rgba(255, 160, 60, 0.28);
-  border-radius: 24px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 175, 75, 0.32);
+  border-radius: 28px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.65),
+    inset 0 1px 0 rgba(255, 210, 150, 0.14);
   transform: scale(0.85);
   transition: transform 0.32s cubic-bezier(0.2, 1.2, 0.4, 1);
 }
 
 .panel-title {
-  font-size: clamp(28px, 6.4vh, 60px);
-  font-weight: 900;
-  letter-spacing: 0.04em;
+  font-size: clamp(30px, 6.6vh, 62px);
+  font-weight: 700;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
   color: var(--ui-main);
-  text-shadow: 0 0 22px rgba(255, 110, 0, 0.6), 0 4px 10px rgba(0, 0, 0, 0.9);
+  text-shadow: 0 0 26px rgba(255, 120, 10, 0.7), 0 4px 10px rgba(0, 0, 0, 0.9);
 }
 
 .panel-newbest {
   font-size: clamp(16px, 3vh, 28px);
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ui-gold);
-  text-shadow: 0 0 14px rgba(255, 200, 0, 0.7);
+  text-shadow: 0 0 16px rgba(255, 200, 0, 0.8);
   min-height: 1.2em;
 }
 
@@ -268,22 +289,23 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  padding: clamp(8px, 1.6vh, 15px) clamp(14px, 4vw, 24px);
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 160, 60, 0.18);
-  border-radius: 12px;
+  padding: clamp(9px, 1.7vh, 16px) clamp(16px, 4.2vw, 26px);
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 170, 70, 0.2);
+  border-radius: 14px;
 }
 
 .panel-row .label {
   font-size: clamp(12px, 2vh, 18px);
+  font-weight: 500;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  opacity: 0.8;
+  opacity: 0.78;
 }
 
 .panel-row .value {
   font-size: clamp(20px, 3.6vh, 34px);
-  font-weight: 800;
+  font-weight: 700;
   color: var(--ui-main);
 }
 
@@ -292,21 +314,23 @@ body {
   cursor: pointer;
   border: none;
   border-radius: 999px;
-  padding: clamp(14px, 2.6vh, 24px) clamp(46px, 14vw, 90px);
-  font-size: clamp(20px, 3.8vh, 34px);
-  font-weight: 900;
-  letter-spacing: 0.08em;
+  padding: clamp(15px, 2.7vh, 25px) clamp(48px, 15vw, 94px);
+  font-size: clamp(21px, 4vh, 36px);
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: #2a1400;
   background: linear-gradient(180deg, var(--ui-gold), var(--ui-main));
-  box-shadow: 0 8px 0 rgba(120, 50, 0, 0.6), 0 12px 26px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 8px 0 rgba(120, 50, 0, 0.65), 0 14px 28px rgba(0, 0, 0, 0.5),
+    inset 0 2px 0 rgba(255, 255, 255, 0.35);
   transition: transform 0.08s ease, box-shadow 0.08s ease;
   font-family: inherit;
 }
 
 #retry-btn:active {
   transform: translateY(5px);
-  box-shadow: 0 3px 0 rgba(120, 50, 0, 0.6), 0 6px 16px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 3px 0 rgba(120, 50, 0, 0.65), 0 6px 16px rgba(0, 0, 0, 0.5),
+    inset 0 2px 0 rgba(255, 255, 255, 0.35);
 }
 
 /* Paused overlay. */
@@ -317,8 +341,8 @@ body {
   align-items: center;
   justify-content: center;
   font-size: clamp(30px, 8vh, 72px);
-  font-weight: 900;
-  letter-spacing: 0.14em;
+  font-weight: 700;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--ui-text);
   background: rgba(3, 1, 2, 0.55);
@@ -394,40 +418,6 @@ body {
   }
 }
 
-/* --- Mute toggle button (centered flex item in the top bar) --- */
-#hud-mute {
-  flex: 0 0 auto;
-  width: clamp(40px, 9vw, 54px);
-  height: clamp(40px, 9vw, 54px);
-  margin-top: clamp(2px, 0.5vh, 6px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: clamp(18px, 3.6vh, 26px);
-  line-height: 1;
-  border: 1px solid rgba(255, 160, 60, 0.28);
-  border-radius: 50%;
-  background: linear-gradient(
-    180deg,
-    rgba(20, 10, 8, 0.6),
-    rgba(8, 4, 4, 0.78)
-  );
-  color: var(--ui-text);
-  pointer-events: auto;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
-  transition: transform 0.08s ease, opacity 0.2s ease;
-}
-
-#hud-mute:active {
-  transform: scale(0.9);
-}
-
-#hud-mute.muted {
-  opacity: 0.55;
-}
-
 /* --- Skin picker (game-over card) --- */
 .skins-head {
   display: flex;
@@ -439,6 +429,7 @@ body {
 
 .skins-title {
   font-size: clamp(12px, 2vh, 18px);
+  font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   opacity: 0.75;
@@ -449,7 +440,7 @@ body {
   align-items: center;
   gap: 0.4em;
   font-size: clamp(14px, 2.4vh, 20px);
-  font-weight: 800;
+  font-weight: 700;
   color: var(--ui-gold);
 }
 
@@ -509,7 +500,7 @@ body {
 
 .skin-cost {
   font-size: clamp(10px, 1.7vh, 14px);
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0.04em;
   color: var(--ui-text);
   opacity: 0.85;

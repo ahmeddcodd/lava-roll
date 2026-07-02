@@ -172,14 +172,6 @@ export class Game {
       this.restart();
     };
 
-    // Mute toggle from the HUD.
-    this.ui.onToggleMute = () => {
-      this.audio.resume();
-      const muted = this.audio.toggleMute();
-      this.ui.setMuted(muted);
-    };
-    this.ui.setMuted(this.audio.isMuted);
-
     // Announce each biome transition with a toast + a beat of color flash.
     this.biome.onBiomeChange = (name: string) => {
       this.ui.flashMessage(name, 1.4);
