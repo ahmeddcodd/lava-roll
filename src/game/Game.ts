@@ -24,6 +24,7 @@ import { TrackManager } from "./TrackManager";
 import { CollisionSystem } from "./CollisionSystem";
 import { EffectsManager } from "./EffectsManager";
 import { Environment } from "./Environment";
+import { Sky } from "./Sky";
 import { UIManager } from "./UIManager";
 import { SaveManager } from "./SaveManager";
 import { AudioManager } from "./AudioManager";
@@ -53,6 +54,7 @@ export class Game {
   private readonly collisions: CollisionSystem;
   private readonly effects: EffectsManager;
   private readonly environment: Environment;
+  private readonly sky: Sky;
   private readonly biome: BiomeManager;
   private readonly ui: UIManager;
   private readonly save: SaveManager;
@@ -120,7 +122,14 @@ export class Game {
     );
     this.effects = new EffectsManager(scene, this.isMobile);
     this.environment = new Environment(scene, this.sceneMgr);
-    this.biome = new BiomeManager(scene, this.sceneMgr, this.track);
+    this.sky = new Sky(scene, this.camera.camera);
+    this.biome = new BiomeManager(
+      scene,
+      this.sceneMgr,
+      this.track,
+      this.sky,
+      this.effects
+    );
     this.ui = new UIManager(hud);
     this.save = new SaveManager();
     this.audio = new AudioManager();
@@ -239,6 +248,8 @@ export class Game {
       laneLineDiffuse: hex(m.matLaneLine.diffuseColor),
       fog: hex(s.fogColor),
       clear: hex(s.clearColor),
+      skyTop: hex(this.sky.debugColors().top),
+      skyHorizon: hex(this.sky.debugColors().horizon),
     };
   }
 

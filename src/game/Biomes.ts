@@ -26,8 +26,14 @@ export interface BiomePalette {
   pillar: string;
   /** scene.fogColor — the volumetric murk. */
   fog: string;
-  /** scene.clearColor — the sky/backdrop. */
+  /** scene.clearColor — the sky/backdrop fallback (covered by the skydome). */
   background: string;
+  /** Skydome gradient — deep color at the top of the dome. */
+  skyTop: string;
+  /** Skydome gradient — warm glow color at the horizon band. */
+  skyHorizon: string;
+  /** Drifting ambient background particle ("mote") tint. */
+  mote: string;
   /** Hemispheric light diffuse (sky tint). */
   lightDiffuse: [number, number, number];
   /** Hemispheric light groundColor (bounce tint). */
@@ -50,6 +56,9 @@ export const Biomes: BiomePalette[] = [
     pillar: "#191214",
     fog: "#180808",
     background: "#090405",
+    skyTop: "#1a0a12",
+    skyHorizon: "#5a1e0a",
+    mote: "#ff8a1e",
     lightDiffuse: [1, 0.85, 0.72],
     lightGround: [0.25, 0.12, 0.08],
   },
@@ -64,6 +73,9 @@ export const Biomes: BiomePalette[] = [
     pillar: "#3a1526",
     fog: "#2a0a1c",
     background: "#1a0510",
+    skyTop: "#2a0820",
+    skyHorizon: "#7a2a55",
+    mote: "#ff9ad8",
     lightDiffuse: [1, 0.8, 0.9],
     lightGround: [0.3, 0.1, 0.2],
   },
@@ -78,6 +90,9 @@ export const Biomes: BiomePalette[] = [
     pillar: "#4a3a22",
     fog: "#241a0c",
     background: "#120c04",
+    skyTop: "#241505",
+    skyHorizon: "#8a5a2a",
+    mote: "#ffe0a0",
     lightDiffuse: [1, 0.95, 0.78],
     lightGround: [0.3, 0.24, 0.12],
   },
@@ -92,6 +107,9 @@ export const Biomes: BiomePalette[] = [
     pillar: "#12283a",
     fog: "#08161f",
     background: "#040d14",
+    skyTop: "#04121f",
+    skyHorizon: "#0a4a6a",
+    mote: "#8fdcff",
     lightDiffuse: [0.8, 0.92, 1],
     lightGround: [0.08, 0.18, 0.25],
   },

@@ -23,6 +23,11 @@ export class CameraController {
   private shakeStrength = 0;
   private fovPulse = 0;
 
+  // Aspect-driven framing: on wide (landscape) screens the vertical FOV shows
+  // less track, so pull the camera closer/lower so it fills the frame. 1 = no
+  // change (portrait); >1 tightens as the screen widens.
+  private framingScale = 1;
+
   // Reused temporaries to avoid per-frame allocation.
   private readonly targetTmp = new Vector3();
   private readonly desiredTmp = new Vector3();
@@ -47,6 +52,11 @@ export class CameraController {
       aspect < 1
         ? GameConfig.camera.portraitFov
         : GameConfig.camera.landscapeFov;
+
+    // Wider than ~1:1 → progressively pull the camera in so the track keeps
+    // filling the frame (a UniversalCamera's FOV is vertical, so wide screens
+    // otherwise show a tiny, far-looking track). Clamped so it never over-zooms.
+    this.framingScale = aspect <= 1 ? 1 : Math.min(1.6, 1 + (aspect - 1) * 0.45);
   }
 
   /** Instantly place the camera behind the ball (used on start/reset). */
@@ -54,8 +64,8 @@ export class CameraController {
     const p = ball.position;
     this.camera.position.set(
       p.x * 0.35,
-      p.y + GameConfig.camera.followHeight,
-      p.z + GameConfig.camera.followDistance
+      p.y + GameConfig.camera.followHeight / this.framingScale,
+      p.z + GameConfig.camera.followDistance / this.framingScale
     );
     this.lookTmp.set(
       p.x * 0.25,
@@ -70,8 +80,8 @@ export class CameraController {
 
     this.desiredTmp.set(
       p.x * 0.35,
-      p.y + GameConfig.camera.followHeight,
-      p.z + GameConfig.camera.followDistance
+      p.y + GameConfig.camera.followHeight / this.framingScale,
+      p.z + GameConfig.camera.followDistance / this.framingScale
     );
 
     const t = GameConfig.camera.followLerp;

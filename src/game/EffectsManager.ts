@@ -33,6 +33,7 @@ export class EffectsManager {
 
   private readonly trail: ParticleSystem;
   private readonly embers: ParticleSystem;
+  private readonly motes: ParticleSystem;
   private readonly burst: ParticleSystem;
 
   // Pooled expanding glow rings (pickup / landing pops).
@@ -56,6 +57,7 @@ export class EffectsManager {
 
     this.trail = this.makeTrail();
     this.embers = this.makeEmbers();
+    this.motes = this.makeMotes();
     this.burst = this.makeBurst();
     this.makeRingPool();
   }
@@ -173,7 +175,7 @@ export class EffectsManager {
   }
 
   private makeEmbers(): ParticleSystem {
-    const cap = Math.round(this.maxParticles * 0.35);
+    const cap = Math.round(this.maxParticles * 0.2);
     const ps = this.baseSystem("embers", cap);
     ps.emitter = this.emitterNode as unknown as Vector3;
     ps.minEmitBox = new Vector3(-9, -3, 4);
@@ -195,6 +197,45 @@ export class EffectsManager {
     ps.maxEmitPower = 0.9;
     ps.gravity = new Vector3(0, 0.6, 0);
     return ps;
+  }
+
+  /**
+   * Ambient background "motes": slow drifting particles high and wide in the
+   * frame that fill the empty upper sky (design doc §7 backdrop). Subtle (small,
+   * low alpha) so they never compete with gameplay; biome-tinted via setMoteColor.
+   */
+  private makeMotes(): ParticleSystem {
+    const cap = Math.round(this.maxParticles * 0.2);
+    const ps = this.baseSystem("motes", cap);
+    ps.emitter = this.emitterNode as unknown as Vector3;
+    // Tall, high, wide box so motes populate the upper background, not the track.
+    ps.minEmitBox = new Vector3(-14, 2, 4);
+    ps.maxEmitBox = new Vector3(14, 22, 40);
+
+    const moteC = Color3.FromHexString(ThemeConfig.gameplay.emberColor);
+    ps.color1 = new Color4(moteC.r, moteC.g, moteC.b, 0.35);
+    ps.color2 = new Color4(moteC.r, moteC.g, moteC.b, 0.18);
+    ps.colorDead = new Color4(moteC.r, moteC.g, moteC.b, 0);
+
+    ps.minSize = 0.08;
+    ps.maxSize = 0.3;
+    ps.minLifeTime = 3.0;
+    ps.maxLifeTime = 6.0;
+    ps.emitRate = cap * 0.4;
+    // Very gentle drift (mostly upward + slight sideways sway).
+    ps.direction1 = new Vector3(-0.25, 0.2, -0.1);
+    ps.direction2 = new Vector3(0.25, 0.6, 0.1);
+    ps.minEmitPower = 0.15;
+    ps.maxEmitPower = 0.5;
+    ps.gravity = new Vector3(0, 0.15, 0);
+    return ps;
+  }
+
+  /** Tint the ambient motes to the current biome (mutates color channels). */
+  setMoteColor(c: Color3): void {
+    this.motes.color1.set(c.r, c.g, c.b, 0.35);
+    this.motes.color2.set(c.r, c.g, c.b, 0.18);
+    this.motes.colorDead.set(c.r, c.g, c.b, 0);
   }
 
   private makeBurst(): ParticleSystem {
@@ -222,17 +263,20 @@ export class EffectsManager {
     return ps;
   }
 
-  /** Begin continuous effects (trail + embers) for a run. */
+  /** Begin continuous effects (trail + embers + background motes) for a run. */
   startAmbient(): void {
     this.trail.start();
     this.embers.start();
+    this.motes.start();
   }
 
   stopAmbient(): void {
     this.trail.stop();
     this.embers.stop();
+    this.motes.stop();
     this.trail.reset();
     this.embers.reset();
+    this.motes.reset();
   }
 
   /** Keep the trail/ember emitter following the ball; animate rings. */
@@ -260,6 +304,7 @@ export class EffectsManager {
   dispose(): void {
     this.trail.dispose();
     this.embers.dispose();
+    this.motes.dispose();
     this.burst.dispose();
     for (const r of this.rings) {
       r.mesh.dispose();

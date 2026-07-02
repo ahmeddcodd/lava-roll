@@ -5,6 +5,8 @@ import type { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
 import { hexToColor3 } from "./SceneManager";
 import type { SceneManager } from "./SceneManager";
 import type { TrackManager } from "./TrackManager";
+import type { Sky } from "./Sky";
+import type { EffectsManager } from "./EffectsManager";
 import { Biomes, BIOME_BAND, BIOME_FADE, smoothstep } from "./Biomes";
 
 /** Pre-parsed Color3 form of a BiomePalette (parsed once, blended per frame). */
@@ -17,6 +19,9 @@ interface BiomeColors {
   pillar: Color3;
   fog: Color3;
   background: Color3;
+  skyTop: Color3;
+  skyHorizon: Color3;
+  mote: Color3;
   lightDiffuse: Color3;
   lightGround: Color3;
 }
@@ -33,6 +38,8 @@ export class BiomeManager {
   private readonly scene: Scene;
   private readonly sceneMgr: SceneManager;
   private readonly track: TrackManager;
+  private readonly sky: Sky;
+  private readonly effects: EffectsManager;
   private readonly light: HemisphericLight | null;
 
   /** Palettes pre-parsed to Color3 once. */
@@ -46,6 +53,9 @@ export class BiomeManager {
   private readonly bLineBase = new Color3();
   private readonly bLiquid = new Color3();
   private readonly bPillar = new Color3();
+  private readonly bSkyTop = new Color3();
+  private readonly bSkyHorizon = new Color3();
+  private readonly bMote = new Color3();
 
   /** Last integer biome index shown, for detecting biome-entry (toast/flash). */
   private lastBiomeIndex = -1;
@@ -53,10 +63,18 @@ export class BiomeManager {
   /** Fired when the world enters a new biome (name for a toast). Optional. */
   onBiomeChange: ((name: string) => void) | null = null;
 
-  constructor(scene: Scene, sceneMgr: SceneManager, track: TrackManager) {
+  constructor(
+    scene: Scene,
+    sceneMgr: SceneManager,
+    track: TrackManager,
+    sky: Sky,
+    effects: EffectsManager
+  ) {
     this.scene = scene;
     this.sceneMgr = sceneMgr;
     this.track = track;
+    this.sky = sky;
+    this.effects = effects;
     this.light = scene.getLightByName("hemi") as HemisphericLight | null;
 
     this.palettes = Biomes.map((b) => ({
@@ -68,6 +86,9 @@ export class BiomeManager {
       pillar: hexToColor3(b.pillar),
       fog: hexToColor3(b.fog),
       background: hexToColor3(b.background),
+      skyTop: hexToColor3(b.skyTop),
+      skyHorizon: hexToColor3(b.skyHorizon),
+      mote: hexToColor3(b.mote),
       lightDiffuse: new Color3(...b.lightDiffuse),
       lightGround: new Color3(...b.lightGround),
     }));
@@ -99,6 +120,9 @@ export class BiomeManager {
     Color3.LerpToRef(from.accentBright, to.accentBright, t, this.bAccentBright);
     Color3.LerpToRef(from.liquid, to.liquid, t, this.bLiquid);
     Color3.LerpToRef(from.pillar, to.pillar, t, this.bPillar);
+    Color3.LerpToRef(from.skyTop, to.skyTop, t, this.bSkyTop);
+    Color3.LerpToRef(from.skyHorizon, to.skyHorizon, t, this.bSkyHorizon);
+    Color3.LerpToRef(from.mote, to.mote, t, this.bMote);
 
     const m = this.sceneMgr;
 
@@ -131,6 +155,10 @@ export class BiomeManager {
     bg.r = from.background.r + (to.background.r - from.background.r) * t;
     bg.g = from.background.g + (to.background.g - from.background.g) * t;
     bg.b = from.background.b + (to.background.b - from.background.b) * t;
+
+    // Backdrop: gradient skydome + drifting ambient motes (repaint guarded).
+    this.sky.setColors(this.bSkyTop, this.bSkyHorizon);
+    this.effects.setMoteColor(this.bMote);
 
     if (this.light) {
       Color3.LerpToRef(
