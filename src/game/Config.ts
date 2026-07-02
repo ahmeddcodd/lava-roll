@@ -42,6 +42,13 @@ export const GameConfig = {
       launchBoost: 6.5, // small upward pop when leaving a ramp edge
       maxAirTime: 2.2, // safety cap; exceeding it forces a lethal fall
     },
+    // Bounce springs: touching a pad launches the ball far forward. The velocity
+    // is kept under jump.maxAirTime's implied ceiling (2*v/gravity < 2.2s) so a
+    // bounce never trips the lethal air-time cap.
+    spring: {
+      launchVelocity: 20, // ~3x the gap launchBoost — a big, safe hop
+      radius: 0.9, // touch reach added to the ball radius
+    },
   },
 
   track: {

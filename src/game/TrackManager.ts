@@ -1,13 +1,18 @@
 import type { Scene } from "@babylonjs/core/scene";
 import type { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Color3 } from "@babylonjs/core/Maths/math.color";
+import type { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 
 import { GameConfig, TRACK_HALF_WIDTH, groundYAt } from "./Config";
 import { TrackChunk } from "./TrackChunk";
 import { ChunkPatterns, SAFE_PATTERNS } from "./ChunkPatterns";
+import { ThemeConfig } from "./ThemeConfig";
+import { hexToColor3 } from "./SceneManager";
 import type { ChunkPattern } from "./types";
 import type { SceneManager } from "./SceneManager";
 import type { ObstacleSystem } from "./ObstacleSystem";
 import type { CollectibleSystem } from "./CollectibleSystem";
+import type { SpringSystem } from "./SpringSystem";
 
 /**
  * Endless recycled track (design doc §6). Keeps a ring of chunks laid end to end;
@@ -18,6 +23,13 @@ export class TrackManager {
   private readonly chunks: TrackChunk[] = [];
   private readonly obstacles: ObstacleSystem;
   private readonly collectibles: CollectibleSystem;
+  private readonly springs: SpringSystem;
+  private readonly laneLineMat: StandardMaterial;
+  private pulseTime = 0;
+
+  // Base + peak emissive colors for the lane-line speed pulse.
+  private readonly lineBase: Color3;
+  private readonly lineBright: Color3;
 
   /** Number of chunks laid so far since (re)start — drives tutorial safety. */
   private chunksSpawned = 0;
@@ -26,10 +38,15 @@ export class TrackManager {
     scene: Scene,
     sceneMgr: SceneManager,
     obstacles: ObstacleSystem,
-    collectibles: CollectibleSystem
+    collectibles: CollectibleSystem,
+    springs: SpringSystem
   ) {
+    this.laneLineMat = sceneMgr.matLaneLine;
+    this.lineBase = hexToColor3(ThemeConfig.colors.lava).scale(0.85);
+    this.lineBright = hexToColor3(ThemeConfig.colors.lavaBright);
     this.obstacles = obstacles;
     this.collectibles = collectibles;
+    this.springs = springs;
 
     const count = GameConfig.performance.activeTrackChunks;
     for (let i = 0; i < count; i++) {
@@ -39,6 +56,7 @@ export class TrackManager {
           sceneMgr.matStoneTrack,
           sceneMgr.matStoneEdge,
           sceneMgr.matRuneBoost,
+          sceneMgr.matLaneLine,
           i
         )
       );
@@ -55,7 +73,8 @@ export class TrackManager {
         this.pickPattern(),
         z,
         this.obstacles,
-        this.collectibles
+        this.collectibles,
+        this.springs
       );
       z += chunk.length;
     }
@@ -70,7 +89,8 @@ export class TrackManager {
           this.pickPattern(),
           frontZ,
           this.obstacles,
-          this.collectibles
+          this.collectibles,
+          this.springs
         );
       }
     }
@@ -145,6 +165,31 @@ export class TrackManager {
     return (
       Math.abs(pos.x) > GameConfig.track.edgeWarnAbsX &&
       Math.abs(pos.x) <= TRACK_HALF_WIDTH
+    );
+  }
+
+  /**
+   * Set the lane-line pulse endpoints (called by BiomeManager as the biome
+   * cross-fades). Copies into the existing cached Color3s so `pulse` blends
+   * within the current biome's range instead of the original lava colors.
+   */
+  setLineColors(base: Color3, bright: Color3): void {
+    this.lineBase.copyFrom(base);
+    this.lineBright.copyFrom(bright);
+  }
+
+  /**
+   * Animate the glowing lane lines: a base pulse that beats faster/brighter with
+   * speed, for a sense of motion. Recolors one shared material (cheap).
+   */
+  pulse(dt: number, speedNorm: number): void {
+    this.pulseTime += dt * (2.5 + speedNorm * 6);
+    // 0..1 oscillation, biased brighter as speed rises.
+    const wave = (Math.sin(this.pulseTime) * 0.5 + 0.5) * (0.35 + speedNorm * 0.65);
+    this.laneLineMat.emissiveColor.set(
+      this.lineBase.r + (this.lineBright.r - this.lineBase.r) * wave,
+      this.lineBase.g + (this.lineBright.g - this.lineBase.g) * wave,
+      this.lineBase.b + (this.lineBright.b - this.lineBase.b) * wave
     );
   }
 

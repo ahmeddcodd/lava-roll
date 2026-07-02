@@ -9,7 +9,7 @@ import type { Scene } from "@babylonjs/core/scene";
 
 import { GameConfig, LATERAL_LIMIT } from "./Config";
 import { hexToColor3 } from "./SceneManager";
-import { ThemeConfig } from "./ThemeConfig";
+import { skinById, type BallSkin } from "./Skins";
 
 /**
  * The cursed relic ball. Dark stone sphere + emissive lava-crack rings
@@ -29,24 +29,41 @@ export class PlayerBall {
   private readonly rings: Mesh[] = [];
   private readonly glow: Mesh;
 
+  // Ball-owned materials so skins can recolor without touching shared materials.
+  private readonly stoneMat: StandardMaterial;
+  private readonly crackMat: StandardMaterial;
+  private readonly glowMat: StandardMaterial;
+
   // Squash & stretch: 0 = neutral. Positive = stretch (tall), negative = squash
   // (flat). Eases back to 0 each frame for springy game feel.
   private squash = 0;
 
-  constructor(
-    scene: Scene,
-    stoneMat: StandardMaterial,
-    crackMat: StandardMaterial
-  ) {
+  constructor(scene: Scene) {
     this.pivot = new TransformNode("ballPivot", scene);
     this.pivot.position.set(0, this.radius, 0);
+
+    // Dedicated materials (recolored by applySkin); start on the default skin.
+    this.stoneMat = new StandardMaterial("matBallStoneOwned", scene);
+    this.stoneMat.specularColor = new Color3(0.08, 0.08, 0.08);
+    this.stoneMat.maxSimultaneousLights = 1;
+
+    this.crackMat = new StandardMaterial("matBallCrackOwned", scene);
+    this.crackMat.disableLighting = true;
+    this.crackMat.maxSimultaneousLights = 1;
+
+    this.glowMat = new StandardMaterial("matBallGlow", scene);
+    this.glowMat.diffuseColor = new Color3(0, 0, 0);
+    this.glowMat.specularColor = new Color3(0, 0, 0);
+    this.glowMat.disableLighting = true;
+    this.glowMat.alpha = 0.16;
+    this.glowMat.backFaceCulling = false;
 
     this.mesh = MeshBuilder.CreateSphere(
       "ball",
       { diameter: this.radius * 2, segments: 16 },
       scene
     );
-    this.mesh.material = stoneMat;
+    this.mesh.material = this.stoneMat;
     this.mesh.parent = this.pivot;
     this.mesh.position.set(0, 0, 0);
 
@@ -65,7 +82,7 @@ export class PlayerBall {
         { diameter: ringDiameter, thickness: ringThickness, tessellation: 24 },
         scene
       );
-      ring.material = crackMat;
+      ring.material = this.crackMat;
       ring.rotation.set(angles[i][0], angles[i][1], angles[i][2]);
       ring.parent = this.mesh;
       ring.isPickable = false;
@@ -78,16 +95,19 @@ export class PlayerBall {
       { diameter: this.radius * 2.7, segments: 12 },
       scene
     );
-    const glowMat = new StandardMaterial("matBallGlow", scene);
-    glowMat.emissiveColor = hexToColor3(ThemeConfig.colors.lava).scale(0.9);
-    glowMat.diffuseColor = new Color3(0, 0, 0);
-    glowMat.specularColor = new Color3(0, 0, 0);
-    glowMat.disableLighting = true;
-    glowMat.alpha = 0.16;
-    glowMat.backFaceCulling = false;
-    this.glow.material = glowMat;
+    this.glow.material = this.glowMat;
     this.glow.parent = this.mesh;
     this.glow.isPickable = false;
+
+    this.applySkin(skinById("lava_relic"));
+  }
+
+  /** Recolor the ball to a skin (design doc §19). */
+  applySkin(skin: BallSkin): void {
+    this.stoneMat.diffuseColor = hexToColor3(skin.base);
+    this.crackMat.emissiveColor = hexToColor3(skin.crack);
+    this.crackMat.diffuseColor = hexToColor3(skin.crack);
+    this.glowMat.emissiveColor = hexToColor3(skin.glow).scale(0.9);
   }
 
   get position(): Vector3 {

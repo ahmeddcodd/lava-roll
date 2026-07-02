@@ -19,18 +19,16 @@ export interface ActiveObstacle {
 }
 
 /**
- * Pooled hazards: stone blocks, fire pillars, and lava crack strips.
+ * Pooled hazards: stone blocks and fire pillars.
  * One source mesh per type; instances are cloned, recycled, and exposed with
  * half-extents for sphere-vs-AABB collision (design doc §15).
  */
 export class ObstacleSystem {
   private readonly blocks: ActiveObstacle[] = [];
   private readonly pillars: ActiveObstacle[] = [];
-  private readonly cracks: ActiveObstacle[] = [];
 
   private readonly blockSrc: Mesh;
   private readonly pillarSrc: Mesh;
-  private readonly crackSrc: Mesh;
 
   constructor(
     scene: Scene,
@@ -55,17 +53,8 @@ export class ObstacleSystem {
     this.pillarSrc.material = lavaMat;
     this.hideSource(this.pillarSrc);
 
-    this.crackSrc = MeshBuilder.CreateBox(
-      "crackSrc",
-      { width: 2.2, height: 0.12, depth: 0.7 },
-      scene
-    );
-    this.crackSrc.material = lavaMat;
-    this.hideSource(this.crackSrc);
-
     this.fillPool(this.blocks, this.blockSrc, "block", poolPerType, 0.7, 0.6, 0.7);
     this.fillPool(this.pillars, this.pillarSrc, "pillar", poolPerType, 0.45, 1.6, 0.45);
-    this.fillPool(this.cracks, this.crackSrc, "crack", poolPerType, 1.1, 0.06, 0.35);
   }
 
   private hideSource(m: Mesh): void {
@@ -92,11 +81,7 @@ export class ObstacleSystem {
   }
 
   private poolFor(type: ObstacleType): ActiveObstacle[] {
-    return type === "block"
-      ? this.blocks
-      : type === "pillar"
-        ? this.pillars
-        : this.cracks;
+    return type === "block" ? this.blocks : this.pillars;
   }
 
   spawn(type: ObstacleType, x: number, z: number, groundY = 0): void {
@@ -106,10 +91,7 @@ export class ObstacleSystem {
 
     // Rest the obstacle on top of the track surface (groundY follows the slope).
     const yBase = groundY;
-    let y = yBase;
-    if (type === "block") y = yBase + 0.6;
-    else if (type === "pillar") y = yBase + 1.6;
-    else y = yBase + 0.07; // crack sits flush on the slab
+    const y = type === "block" ? yBase + 0.6 : yBase + 1.6;
 
     o.mesh.position.set(x, y, z);
     o.mesh.setEnabled(true);
@@ -121,7 +103,6 @@ export class ObstacleSystem {
   update(_dt: number, ballZ: number): void {
     this.recycle(this.blocks, ballZ);
     this.recycle(this.pillars, ballZ);
-    this.recycle(this.cracks, ballZ);
   }
 
   private recycle(arr: ActiveObstacle[], ballZ: number): void {
@@ -140,7 +121,6 @@ export class ObstacleSystem {
   forEachActive(fn: (o: ActiveObstacle) => void): void {
     for (const o of this.blocks) if (o.active) fn(o);
     for (const o of this.pillars) if (o.active) fn(o);
-    for (const o of this.cracks) if (o.active) fn(o);
   }
 
   /** Sphere-vs-AABB: returns squared distance from sphere center to the box. */

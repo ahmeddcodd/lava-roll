@@ -427,3 +427,120 @@ body {
 #hud-mute.muted {
   opacity: 0.55;
 }
+
+/* --- Skin picker (game-over card) --- */
+.skins-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: clamp(2px, 0.8vh, 8px);
+}
+
+.skins-title {
+  font-size: clamp(12px, 2vh, 18px);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.skins-wallet {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  font-size: clamp(14px, 2.4vh, 20px);
+  font-weight: 800;
+  color: var(--ui-gold);
+}
+
+.wallet-dot {
+  width: 0.7em;
+  height: 0.7em;
+  border-radius: 50%;
+  background: var(--ui-gold);
+  box-shadow: 0 0 8px var(--ui-gold);
+  transform: rotate(45deg);
+}
+
+.skins-row {
+  display: flex;
+  gap: clamp(8px, 2.4vw, 14px);
+  width: 100%;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: clamp(6px, 1.6vh, 16px);
+}
+
+.skin {
+  --skin-glow: #ff6a00;
+  --skin-base: #1a1413;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: clamp(5px, 1vh, 9px) clamp(4px, 1vw, 8px);
+  min-width: clamp(46px, 13vw, 62px);
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  pointer-events: auto;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.1s ease, border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.skin:active {
+  transform: scale(0.92);
+}
+
+.skin-orb {
+  width: clamp(26px, 6.5vw, 36px);
+  height: clamp(26px, 6.5vw, 36px);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 35% 30%,
+    var(--skin-glow),
+    var(--skin-base) 72%
+  );
+  box-shadow: 0 0 10px var(--skin-glow), inset 0 0 6px rgba(0, 0, 0, 0.5);
+}
+
+.skin-cost {
+  font-size: clamp(10px, 1.7vh, 14px);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--ui-text);
+  opacity: 0.85;
+}
+
+/* Owned but not equipped: subtle confirmation. */
+.skin.owned .skin-cost {
+  color: var(--ui-main);
+}
+
+/* Equipped: highlighted border + glow. */
+.skin.equipped {
+  border-color: var(--skin-glow);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--skin-glow) 55%, transparent);
+}
+
+.skin.equipped .skin-cost {
+  color: var(--skin-glow);
+}
+
+/* Locked + unaffordable: dimmed with a price tag. */
+.skin.locked {
+  opacity: 0.5;
+}
+
+.skin.locked .skin-cost {
+  color: var(--ui-gold);
+}
+
+.skin.locked .skin-cost::before {
+  content: "◆ ";
+  font-size: 0.85em;
+}

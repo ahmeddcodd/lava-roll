@@ -13,7 +13,7 @@ export type GameState = (typeof GameState)[keyof typeof GameState];
 /** Lane index: -1 left, 0 center, 1 right (design doc §14). */
 export type Lane = -1 | 0 | 1;
 
-export type ObstacleType = "block" | "pillar" | "crack";
+export type ObstacleType = "block" | "pillar";
 
 export interface ObstacleSpec {
   type: ObstacleType;
@@ -38,6 +38,11 @@ export interface BoostPadSpec {
   z: number;
 }
 
+export interface SpringSpec {
+  lane: number;
+  z: number;
+}
+
 /** A reusable track-chunk template selected by difficulty (design doc §14). */
 export interface ChunkPattern {
   id: string;
@@ -46,6 +51,7 @@ export interface ChunkPattern {
   collectibles?: CollectibleSpec[];
   gaps?: GapSpec[];
   boostPads?: BoostPadSpec[];
+  springs?: SpringSpec[];
 }
 
 /** Live scoring / run state shared across systems. */

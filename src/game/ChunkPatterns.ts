@@ -76,18 +76,6 @@ export const ChunkPatterns: ChunkPattern[] = [
     ],
   },
   {
-    id: "lava_crack",
-    difficulty: 2,
-    obstacles: [
-      { type: "crack", lane: -1, z: 7 },
-      { type: "crack", lane: 0, z: 7 },
-    ],
-    collectibles: [
-      { lane: 1, z: 7 },
-      { lane: 1, z: 10 },
-    ],
-  },
-  {
     id: "split_gap",
     difficulty: 2,
     gaps: [{ lane: 0, zStart: 5, zEnd: 10 }],
@@ -123,13 +111,34 @@ export const ChunkPatterns: ChunkPattern[] = [
     obstacles: [
       { type: "block", lane: -1, z: 4 },
       { type: "pillar", lane: 1, z: 8 },
-      { type: "crack", lane: -1, z: 12 },
-      { type: "crack", lane: 0, z: 12 },
+      { type: "block", lane: 0, z: 12 },
     ],
     collectibles: [
       { lane: 1, z: 4 },
       { lane: -1, z: 8 },
       { lane: 1, z: 12 },
+    ],
+  },
+  {
+    // Bounce off the center spring and sail into the reward coins ahead.
+    id: "spring_hop",
+    difficulty: 1,
+    springs: [{ lane: 0, z: 5 }],
+    collectibles: [
+      { lane: 0, z: 9 },
+      { lane: 0, z: 11 },
+      { lane: 0, z: 13 },
+    ],
+  },
+  {
+    // A spring set just before a gap so the bounce helps carry you across it.
+    id: "spring_gap",
+    difficulty: 2,
+    springs: [{ lane: 0, z: 4 }],
+    gaps: [{ lane: 0, zStart: 7, zEnd: 12 }],
+    collectibles: [
+      { lane: -1, z: 9 },
+      { lane: 1, z: 9 },
     ],
   },
 ];
@@ -139,6 +148,7 @@ export const SAFE_PATTERN_IDS = new Set([
   "straight_safe",
   "coin_line",
   "risk_coin_edge",
+  "spring_hop",
 ]);
 
 export const SAFE_PATTERNS = ChunkPatterns.filter((p) =>

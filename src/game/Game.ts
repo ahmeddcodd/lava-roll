@@ -19,6 +19,7 @@ import { InputManager } from "./InputManager";
 import { CameraController } from "./CameraController";
 import { ObstacleSystem } from "./ObstacleSystem";
 import { CollectibleSystem } from "./CollectibleSystem";
+import { SpringSystem } from "./SpringSystem";
 import { TrackManager } from "./TrackManager";
 import { CollisionSystem } from "./CollisionSystem";
 import { EffectsManager } from "./EffectsManager";
@@ -26,6 +27,8 @@ import { Environment } from "./Environment";
 import { UIManager } from "./UIManager";
 import { SaveManager } from "./SaveManager";
 import { AudioManager } from "./AudioManager";
+import { BallSkins, skinById } from "./Skins";
+import { BiomeManager } from "./BiomeManager";
 import { ThemeConfig } from "./ThemeConfig";
 
 const MAX_DT = 1 / 20; // clamp delta to avoid spiral-of-death on tab return
@@ -45,10 +48,12 @@ export class Game {
   private readonly camera: CameraController;
   private readonly obstacles: ObstacleSystem;
   private readonly collectibles: CollectibleSystem;
+  private readonly springs: SpringSystem;
   private readonly track: TrackManager;
   private readonly collisions: CollisionSystem;
   private readonly effects: EffectsManager;
   private readonly environment: Environment;
+  private readonly biome: BiomeManager;
   private readonly ui: UIManager;
   private readonly save: SaveManager;
   private readonly audio: AudioManager;
@@ -89,11 +94,7 @@ export class Game {
     this.sceneMgr.applyPerformanceSettings(this.engine, this.isMobile);
     const scene = this.sceneMgr.scene;
 
-    this.ball = new PlayerBall(
-      scene,
-      this.sceneMgr.matBallStone,
-      this.sceneMgr.matBallCrackGlow
-    );
+    this.ball = new PlayerBall(scene);
     this.camera = new CameraController(scene, this.ball);
     scene.activeCamera = this.camera.camera;
 
@@ -104,11 +105,13 @@ export class Game {
       this.sceneMgr.matLava
     );
     this.collectibles = new CollectibleSystem(scene, this.sceneMgr.matGold);
+    this.springs = new SpringSystem(scene, this.sceneMgr.matRuneBoost);
     this.track = new TrackManager(
       scene,
       this.sceneMgr,
       this.obstacles,
-      this.collectibles
+      this.collectibles,
+      this.springs
     );
     this.collisions = new CollisionSystem(
       this.obstacles,
@@ -117,11 +120,16 @@ export class Game {
     );
     this.effects = new EffectsManager(scene, this.isMobile);
     this.environment = new Environment(scene, this.sceneMgr);
+    this.biome = new BiomeManager(scene, this.sceneMgr, this.track);
     this.ui = new UIManager(hud);
     this.save = new SaveManager();
     this.audio = new AudioManager();
 
+    // Equip the player's saved skin.
+    this.ball.applySkin(skinById(this.save.equipped));
+
     this.wireEvents();
+    this.refreshSkinUI();
   }
 
   private wireEvents(): void {
@@ -131,6 +139,14 @@ export class Game {
       this.effects.ring(pos, "gold");
       this.audio.collect(this.coins);
       this.ui.pop("coins");
+    };
+
+    // Spring bounce: pop ring + jump SFX + a bit of camera kick and screen flash.
+    this.springs.onBounce = (pos: Vector3) => {
+      this.effects.ring(pos, "trail");
+      this.audio.jump();
+      this.camera.shake(0.25, 0.3);
+      this.ui.flash("cyan");
     };
 
     // First input starts the run and unlocks audio (needs a user gesture).
@@ -155,6 +171,31 @@ export class Game {
     };
     this.ui.setMuted(this.audio.isMuted);
 
+    // Announce each biome transition with a toast + a beat of color flash.
+    this.biome.onBiomeChange = (name: string) => {
+      this.ui.flashMessage(name, 1.4);
+      this.ui.flash("cyan");
+    };
+
+    // Skin tapped in the picker: buy if needed+affordable, then equip.
+    this.ui.onSkinTap = (id: string) => {
+      this.audio.resume();
+      const skin = skinById(id);
+      if (!this.save.owns(id)) {
+        if (this.save.buy(id, skin.cost)) {
+          this.audio.newBest(); // celebratory unlock sting
+        } else {
+          this.audio.hit(); // can't afford — dull thud
+          this.refreshSkinUI();
+          return;
+        }
+      }
+      this.save.equip(id);
+      this.ball.applySkin(skin);
+      this.audio.tap();
+      this.refreshSkinUI();
+    };
+
     // Resize: keep the run going, just re-fit engine + camera framing.
     window.addEventListener("resize", () => this.onResize());
     this.onResize();
@@ -172,6 +213,60 @@ export class Game {
     this.enterReady();
     this.lastTime = performance.now();
     this.engine.runRenderLoop(() => this.frame());
+  }
+
+  /**
+   * Debug snapshot of biome-driven state (colors + distance). Exposed only under
+   * the ?debug URL flag (see main.ts) for automated verification; not used in
+   * normal play. `advanceDistance` optionally forces a biome recolor at a target
+   * distance without waiting for real travel.
+   */
+  debugBiomeState(advanceDistance?: number): Record<string, unknown> {
+    if (advanceDistance !== undefined) this.biome.update(advanceDistance);
+    const m = this.sceneMgr;
+    const s = this.sceneMgr.scene;
+    const hex = (c: { r: number; g: number; b: number }) =>
+      "#" +
+      [c.r, c.g, c.b]
+        .map((v) => Math.round(Math.min(1, Math.max(0, v)) * 255).toString(16).padStart(2, "0"))
+        .join("");
+    return {
+      distance: this.distance,
+      track: hex(m.matStoneTrack.diffuseColor),
+      edgeDiffuse: hex(m.matStoneEdge.diffuseColor),
+      lava: hex(m.matLava.diffuseColor),
+      pillar: hex(m.matBackgroundTemple.diffuseColor),
+      laneLineDiffuse: hex(m.matLaneLine.diffuseColor),
+      fog: hex(s.fogColor),
+      clear: hex(s.clearColor),
+    };
+  }
+
+  /**
+   * Debug snapshot of live play/physics state. Exposed only under ?debug for
+   * automated verification (spring bounces, no false game-over); not used in play.
+   */
+  debugPlayState(): Record<string, unknown> {
+    const groundY = this.track.getTrackHeightAt(this.ball.position.z);
+    return {
+      state: this.state,
+      distance: this.distance,
+      ballY: this.ball.position.y,
+      ballX: this.ball.position.x,
+      groundY,
+      heightAboveGround: this.ball.position.y - (groundY + this.ball.radius),
+      airborne: this.ball.airborne,
+      verticalVelocity: this.ball.verticalVelocity,
+      gameOver: this.state === GameState.GameOver,
+    };
+  }
+
+  /** Debug: drop a spring just ahead of the ball for deterministic testing. */
+  debugSpawnSpringAhead(dz = 3): void {
+    const z = this.ball.position.z + dz;
+    // getTrackHeightAt returns the slab-top center; +0.14 rests the pad flush,
+    // matching TrackChunk's spring spawn offset.
+    this.springs.spawn(this.ball.position.x, this.track.getTrackHeightAt(z) + 0.14, z);
   }
 
   private frame(): void {
@@ -265,8 +360,10 @@ export class Game {
     this.input.reset();
     this.obstacles.reset();
     this.collectibles.reset();
+    this.springs.reset();
     this.collisions.reset();
     this.track.reset();
+    this.biome.reset();
     this.environment.reset(this.ball.position.z);
     this.effects.stopAmbient();
     this.camera.snapTo(this.ball);
@@ -279,6 +376,8 @@ export class Game {
     this.ball.update(dt, 0, 0);
     this.ball.stickToGround(this.track.getTrackHeightAt(this.ball.position.z));
     this.effects.update(this.ball, dt);
+    this.biome.update(0);
+    this.track.pulse(dt, 0);
     this.camera.update(this.ball, dt, this.speed);
 
     if (this.tutorialTimer > 0) {
@@ -306,6 +405,7 @@ export class Game {
     this.track.update(this.ball.position.z);
     this.obstacles.update(dt, this.ball.position.z);
     this.collectibles.update(dt, this.ball.position.z);
+    this.springs.update(dt, this.ball.position.z);
     this.environment.update(this.ball.position.z);
     this.effects.update(this.ball, dt);
 
@@ -328,6 +428,14 @@ export class Game {
       this.hitStop(0.09);
       this.startFalling();
       return;
+    }
+
+    // Bounce springs: launch far forward while still grounded (check() gates on
+    // !airborne, so this fires once per contact). airTimer resets like a gap-jump
+    // so the air-time cap is measured from the bounce, not before it.
+    if (this.springs.check(this.ball)) {
+      this.ball.launch(GameConfig.player.spring.launchVelocity);
+      this.airTimer = 0;
     }
 
     // --- Vertical: roll down the slope, coast across gaps, land on next slope ---
@@ -398,11 +506,15 @@ export class Game {
       this.onSpeedUp();
     }
 
-    // Feed normalized speed to the music so it rises with velocity.
+    // Cross-fade the world biome (lava → candy → sand → water, cycling).
+    this.biome.update(this.distance);
+
+    // Feed normalized speed to the music + lane-line pulse so both rise with speed.
     const speedNorm =
       (this.speed - GameConfig.player.startSpeed) /
       (GameConfig.player.maxSpeed - GameConfig.player.startSpeed);
     this.audio.setIntensity(speedNorm);
+    this.track.pulse(dt, speedNorm);
 
     this.camera.update(this.ball, dt, this.speed);
     this.ui.update(this.distance, this.coins, dt);
@@ -445,10 +557,29 @@ export class Game {
     this.state = GameState.GameOver;
     const finalScore = Math.max(this.score, this.distance);
     const isNewBest = this.save.submit(finalScore);
+    // Bank this run's idols into the persistent wallet (spendable on skins).
+    this.save.addIdols(this.coins);
     this.ui.showGameOver(finalScore, this.coins, this.save.best, isNewBest);
+    this.refreshSkinUI();
     this.audio.duckMusic();
     if (isNewBest) this.audio.newBest();
     else this.audio.gameOver();
+  }
+
+  /** Push current wallet + skin ownership/equip state into the UI picker. */
+  private refreshSkinUI(): void {
+    this.ui.renderSkins(
+      BallSkins.map((s) => ({
+        id: s.id,
+        name: s.name,
+        cost: s.cost,
+        glow: s.glow,
+        base: s.base,
+        owned: this.save.owns(s.id),
+        equipped: this.save.equipped === s.id,
+      })),
+      this.save.idols
+    );
   }
 
   private onResize(): void {

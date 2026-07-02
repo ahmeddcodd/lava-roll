@@ -8,6 +8,7 @@ import { GameConfig, LANE_WIDTH, laneToX, groundYAt, SLOPE_ANGLE_RAD } from "./C
 import type { ChunkPattern, GapSpec } from "./types";
 import type { ObstacleSystem } from "./ObstacleSystem";
 import type { CollectibleSystem } from "./CollectibleSystem";
+import type { SpringSystem } from "./SpringSystem";
 
 const { chunkLength, chunkThickness, width } = GameConfig.track;
 
@@ -37,6 +38,7 @@ export class TrackChunk {
     trackMat: StandardMaterial,
     edgeMat: StandardMaterial,
     boostMat: StandardMaterial,
+    laneLineMat: StandardMaterial,
     index: number
   ) {
     this.root = new TransformNode(`chunk${index}`, scene);
@@ -60,12 +62,39 @@ export class TrackChunk {
       this.laneSegments.push(segs as [Mesh, Mesh]);
     }
 
-    // Side edge rails for readability.
-    const edgeH = 0.35;
+    // Glowing lane divider lines (between lane -1/0 and 0/1), sitting just above
+    // the surface so they read as bright seams down the track.
+    const lineTopY = chunkThickness / 2 + 0.015;
+    for (const dx of [-0.5, 0.5]) {
+      const line = MeshBuilder.CreateBox(
+        `chunk${index}_line${dx}`,
+        { width: 0.1, height: 0.05, depth: chunkLength },
+        scene
+      );
+      line.material = laneLineMat;
+      line.position.set(dx * laneW, lineTopY, chunkLength / 2);
+      line.parent = this.root;
+      line.isPickable = false;
+    }
+
+    // Center divider dashes are covered by lane lines; add a bright chunk seam
+    // strip across the near edge for endless-track rhythm / speed feel.
+    const seam = MeshBuilder.CreateBox(
+      `chunk${index}_seam`,
+      { width: width, height: 0.06, depth: 0.35 },
+      scene
+    );
+    seam.material = laneLineMat;
+    seam.position.set(0, lineTopY, 0.2);
+    seam.parent = this.root;
+    seam.isPickable = false;
+
+    // Side edge rails — brighter emissive so the track boundary pops.
+    const edgeH = 0.4;
     for (const side of [-1, 1]) {
       const rail = MeshBuilder.CreateBox(
         `chunk${index}_edge${side}`,
-        { width: 0.28, height: edgeH, depth: chunkLength },
+        { width: 0.3, height: edgeH, depth: chunkLength },
         scene
       );
       rail.material = edgeMat;
@@ -119,7 +148,8 @@ export class TrackChunk {
     pattern: ChunkPattern,
     startZ: number,
     obstacles: ObstacleSystem,
-    collectibles: CollectibleSystem
+    collectibles: CollectibleSystem,
+    springs: SpringSystem
   ): void {
     this.startZ = startZ;
     this.root.position.z = startZ;
@@ -168,6 +198,14 @@ export class TrackChunk {
         pad.position.z = b.z;
         pad.setEnabled(true);
       });
+    }
+
+    if (pattern.springs) {
+      for (const s of pattern.springs) {
+        const wz = startZ + s.z;
+        // Rest the pad flush on the slope surface (half its 0.28 height above).
+        springs.spawn(laneToX(s.lane), groundYAt(wz) + chunkThickness / 2 + 0.14, wz);
+      }
     }
   }
 

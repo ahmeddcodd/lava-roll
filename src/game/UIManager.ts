@@ -1,5 +1,16 @@
 import { ThemeConfig } from "./ThemeConfig";
 
+/** View-model for one skin option in the picker row. */
+export interface SkinOption {
+  id: string;
+  name: string;
+  cost: number;
+  glow: string;
+  base: string;
+  owned: boolean;
+  equipped: boolean;
+}
+
 /**
  * HTML/CSS HUD overlay (design doc §9). Kept out of Babylon GUI to minimize
  * bundle size. Builds the DOM once, then updates text/visibility per frame.
@@ -7,6 +18,7 @@ import { ThemeConfig } from "./ThemeConfig";
 export class UIManager {
   onRetry: (() => void) | null = null;
   onToggleMute: (() => void) | null = null;
+  onSkinTap: ((id: string) => void) | null = null;
 
   private readonly root: HTMLElement;
   private readonly distanceEl: HTMLElement;
@@ -24,6 +36,8 @@ export class UIManager {
   private readonly panelDistanceEl: HTMLElement;
   private readonly panelCoinsEl: HTMLElement;
   private readonly panelBestEl: HTMLElement;
+  private readonly walletEl: HTMLElement;
+  private readonly skinsRowEl: HTMLElement;
 
   private messageTimer = 0;
 
@@ -61,6 +75,11 @@ export class UIManager {
             <div class="panel-row"><span class="label">${labels.collectible}</span><span class="value" id="hud-panel-coins">0</span></div>
             <div class="panel-row"><span class="label">Best</span><span class="value" id="hud-panel-best">0</span></div>
           </div>
+          <div class="skins-head">
+            <span class="skins-title">Skins</span>
+            <span class="skins-wallet"><span class="wallet-dot"></span><span id="hud-wallet">0</span></span>
+          </div>
+          <div class="skins-row" id="hud-skins"></div>
           <button id="retry-btn" type="button">${labels.retry}</button>
         </div>
       </div>
@@ -79,6 +98,8 @@ export class UIManager {
     this.panelBestEl = this.byId("hud-panel-best");
     this.flashEl = this.byId("hud-flash");
     this.muteBtn = this.byId("hud-mute");
+    this.walletEl = this.byId("hud-wallet");
+    this.skinsRowEl = this.byId("hud-skins");
 
     this.byId("retry-btn").addEventListener("click", () => this.onRetry?.());
     this.muteBtn.addEventListener("click", (e) => {
@@ -161,6 +182,40 @@ export class UIManager {
     this.panelBestEl.textContent = String(best);
     this.panelNewBestEl.textContent = isNewBest ? ThemeConfig.labels.newBest : "";
     this.panelEl.classList.add("show");
+  }
+
+  /** Rebuild the skin picker row from the current wallet + ownership state. */
+  renderSkins(skins: SkinOption[], wallet: number): void {
+    this.walletEl.textContent = String(wallet);
+    this.skinsRowEl.innerHTML = "";
+    for (const s of skins) {
+      const affordable = s.owned || wallet >= s.cost;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className =
+        "skin" +
+        (s.equipped ? " equipped" : "") +
+        (s.owned ? " owned" : "") +
+        (!s.owned && !affordable ? " locked" : "");
+      btn.style.setProperty("--skin-glow", s.glow);
+      btn.style.setProperty("--skin-base", s.base);
+      // Orb swatch + status label (EQUIPPED / cost / ✓).
+      const label = s.equipped
+        ? "ON"
+        : s.owned
+          ? "✓"
+          : String(s.cost);
+      btn.innerHTML =
+        `<span class="skin-orb"></span>` +
+        `<span class="skin-cost">${label}</span>`;
+      btn.setAttribute("aria-label", s.name);
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.onSkinTap?.(s.id);
+      });
+      btn.addEventListener("pointerdown", (e) => e.stopPropagation());
+      this.skinsRowEl.appendChild(btn);
+    }
   }
 
   hideGameOver(): void {

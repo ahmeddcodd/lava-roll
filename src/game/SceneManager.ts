@@ -30,6 +30,7 @@ export class SceneManager {
   readonly matObstacle: StandardMaterial;
   readonly matRuneBoost: StandardMaterial;
   readonly matBackgroundTemple: StandardMaterial;
+  readonly matLaneLine: StandardMaterial;
 
   constructor(engine: Engine) {
     const scene = new Scene(engine);
@@ -41,7 +42,7 @@ export class SceneManager {
     // Exponential fog hides far detail and sells the volcanic murk (design doc §7).
     scene.fogMode = Scene.FOGMODE_EXP2;
     scene.fogColor = hexToColor3(c.fog);
-    scene.fogDensity = 0.018;
+    scene.fogDensity = 0.014;
 
     // Single hemispheric light — no shadows in MVP.
     const light = new HemisphericLight("hemi", new Vector3(0.2, 1, -0.35), scene);
@@ -56,10 +57,19 @@ export class SceneManager {
       specular: 0.02,
     });
 
+    // Side rails glow warmly so the track edges read instantly on small screens.
     this.matStoneEdge = this.makeMat("matStoneEdge", c.edge, {
       specular: 0.04,
       emissive: c.lava,
-      emissiveScale: 0.06,
+      emissiveScale: 0.5,
+    });
+
+    // Emissive lane divider lines (fake glow, unlit). Brightness is animated by
+    // the track for a speed pulse.
+    this.matLaneLine = this.makeMat("matLaneLine", c.lavaBright, {
+      emissive: c.lava,
+      emissiveScale: 0.85,
+      disableLighting: true,
     });
 
     this.matLava = this.makeMat("matLava", c.lava, {
