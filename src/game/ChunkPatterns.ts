@@ -56,18 +56,19 @@ export const ChunkPatterns: ChunkPattern[] = [
     ],
   },
   {
-    // Two side blocks on opposite lanes, staggered — weave center then out.
+    // Two side blocks on opposite lanes, well spaced — weave from one side to the
+    // other with room to spare (a full-track lane change gets ~7 units of z).
     id: "left_right_blocks",
     difficulty: 1,
     obstacles: [
-      { type: "block", lane: -1, z: 5 },
-      { type: "block", lane: 1, z: 10 },
+      { type: "block", lane: -1, z: 4 },
+      { type: "block", lane: 1, z: 11 },
     ],
     collectibles: [
       { lane: 0, z: 3 },
-      { lane: 1, z: 5 },
+      { lane: 1, z: 4 },
       { lane: 0, z: 7.5 },
-      { lane: -1, z: 10 },
+      { lane: -1, z: 11 },
       { lane: 0, z: 13 },
     ],
   },
@@ -87,36 +88,36 @@ export const ChunkPatterns: ChunkPattern[] = [
 
   // ---------- difficulty 2: pillars, gem clusters, spring runs ----------
   {
-    // Alternating side pillars — snake between them; coins in the open lane.
+    // Alternating side pillars — snake between them. Spaced far apart in z so a
+    // full-track weave (-1 → +1) always has generous dodge room.
     id: "fire_pillars",
     difficulty: 2,
     obstacles: [
+      { type: "pillar", lane: -1, z: 4 },
+      { type: "pillar", lane: 1, z: 11 },
+    ],
+    collectibles: [
+      { lane: 1, z: 4 },
+      { lane: 0, z: 6 },
+      { lane: 0, z: 8 },
+      { lane: -1, z: 11 },
+      { lane: 0, z: 13 },
+    ],
+  },
+  {
+    // Pillar gate: two side pillars STAGGERED far apart in z, so you weave -1 → +1
+    // with a full open lane AND plenty of dodge room at every moment.
+    id: "pillar_gate",
+    difficulty: 2,
+    obstacles: [
       { type: "pillar", lane: -1, z: 5 },
-      { type: "pillar", lane: 1, z: 9 },
-      { type: "pillar", lane: -1, z: 13 },
+      { type: "pillar", lane: 1, z: 12 },
     ],
     collectibles: [
       { lane: 1, z: 5 },
       { lane: 0, z: 7 },
-      { lane: -1, z: 9 },
-      { lane: 0, z: 11 },
-      { lane: 1, z: 13 },
-    ],
-  },
-  {
-    // Pillar gate: two side pillars STAGGERED in z (not the same row), so you
-    // weave -1 → +1 with a full open lane at every moment — never a needle-thread.
-    id: "pillar_gate",
-    difficulty: 2,
-    obstacles: [
-      { type: "pillar", lane: -1, z: 6 },
-      { type: "pillar", lane: 1, z: 10 },
-    ],
-    collectibles: [
-      { lane: 1, z: 6 },
-      { lane: 0, z: 8 },
-      { lane: -1, z: 10 },
-      { lane: 0, z: 13 },
+      { lane: 0, z: 9 },
+      { lane: -1, z: 12 },
     ],
   },
   {
@@ -147,51 +148,53 @@ export const ChunkPatterns: ChunkPattern[] = [
 
   // ---------- difficulty 3: gauntlets, weaves, mixed hazards ----------
   {
-    // Three blocks weaving center→left→right; coins in the freed lane each time.
+    // Blocks weaving center → right; each lane change gets ~6 units of dodge room.
+    // Only single-lane shifts (0→+1, +1→ open) so it never demands a hard swerve.
     id: "block_weave",
     difficulty: 3,
     obstacles: [
       { type: "block", lane: 0, z: 4 },
-      { type: "block", lane: -1, z: 8 },
-      { type: "block", lane: 1, z: 12 },
+      { type: "block", lane: 1, z: 10 },
     ],
     collectibles: [
       { lane: -1, z: 4 },
-      { lane: 0, z: 6 },
-      { lane: 1, z: 8 },
-      { lane: 0, z: 10 },
-      { lane: -1, z: 12 },
-    ],
-  },
-  {
-    // Block then barrier on opposite sides — cut across the middle between them.
-    id: "block_barrier_mix",
-    difficulty: 3,
-    obstacles: [
-      { type: "block", lane: -1, z: 5 },
-      { type: "barrier", lane: 1, z: 10 },
-    ],
-    collectibles: [
-      { lane: 1, z: 5 },
-      { lane: 0, z: 7.5 },
+      { lane: 1, z: 6 },
+      { lane: 0, z: 8 },
       { lane: -1, z: 10 },
       { lane: 0, z: 13 },
     ],
   },
   {
-    // Full gauntlet: barrier, pillar, block down the three lanes in turn.
+    // Block then barrier on opposite sides, well spaced — cut across the middle
+    // with a generous ~7 units before the second hazard.
+    id: "block_barrier_mix",
+    difficulty: 3,
+    obstacles: [
+      { type: "block", lane: -1, z: 4 },
+      { type: "barrier", lane: 1, z: 11 },
+    ],
+    collectibles: [
+      { lane: 1, z: 4 },
+      { lane: 0, z: 7.5 },
+      { lane: -1, z: 11 },
+      { lane: 0, z: 13 },
+    ],
+  },
+  {
+    // Gauntlet: barrier left, then block right — each lane change gets ~7 units of
+    // dodge room. A single wide weave rather than a rapid-fire triple swerve.
     id: "gauntlet",
     difficulty: 3,
     obstacles: [
       { type: "barrier", lane: -1, z: 4 },
-      { type: "pillar", lane: 1, z: 8 },
-      { type: "block", lane: 0, z: 12 },
+      { type: "block", lane: 1, z: 11 },
     ],
     collectibles: [
       { lane: 1, z: 4 },
       { lane: 0, z: 6 },
-      { lane: -1, z: 8 },
-      { lane: 1, z: 12 },
+      { lane: 0, z: 8 },
+      { lane: -1, z: 11 },
+      { lane: 0, z: 13 },
     ],
   },
   {

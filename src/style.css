@@ -318,6 +318,15 @@ body {
   pointer-events: auto;
 }
 
+/* CRITICAL: the panel's buttons (.skin, #retry-btn) set pointer-events:auto on
+   themselves, so they stay tappable even while the panel is invisible (opacity 0)
+   on the Ready/Playing screens — a thumb tap in the lower-center then hits a skin
+   (changes ball color) or retry (re-lays the track) instead of starting the run.
+   Force ALL panel descendants non-interactive unless the panel is actually shown. */
+#hud-panel:not(.show) * {
+  pointer-events: none !important;
+}
+
 #hud-panel.show .panel-card {
   transform: scale(1);
 }

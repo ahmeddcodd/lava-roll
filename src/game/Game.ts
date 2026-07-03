@@ -188,6 +188,10 @@ export class Game {
 
     // Skin tapped in the picker: buy if needed+affordable, then equip.
     this.ui.onSkinTap = (id: string) => {
+      // The picker only lives in the game-over panel. Ignore any tap that reaches
+      // it in another state (defensive: a stray tap must never change the ball or
+      // wallet on the Ready/Playing screen — the tap should start the run instead).
+      if (this.state !== GameState.GameOver) return;
       this.audio.resume();
       const skin = skinById(id);
       if (!this.save.owns(id)) {

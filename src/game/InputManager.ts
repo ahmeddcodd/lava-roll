@@ -112,12 +112,15 @@ export class InputManager {
       this.keys.delete(e.key.toLowerCase());
     };
 
-    canvas.addEventListener("pointerdown", this.onDown);
+    // Passive listeners: we never call preventDefault in these, so marking them
+    // passive lets the browser deliver them without waiting on the handler —
+    // lower touch-to-steer latency on mobile.
+    canvas.addEventListener("pointerdown", this.onDown, { passive: true });
     // Mouse steering needs move events even with no button down, so listen on
     // the window; the handler filters by scheme / captured pointer id.
-    window.addEventListener("pointermove", this.onMove);
-    window.addEventListener("pointerup", this.onUp);
-    window.addEventListener("pointercancel", this.onUp);
+    window.addEventListener("pointermove", this.onMove, { passive: true });
+    window.addEventListener("pointerup", this.onUp, { passive: true });
+    window.addEventListener("pointercancel", this.onUp, { passive: true });
     window.addEventListener("keydown", this.onKeyDown);
     window.addEventListener("keyup", this.onKeyUp);
   }
