@@ -1,5 +1,5 @@
 /**
- * GameConfig — single source of tuning truth for Lava Temple Roll.
+ * GameConfig — single source of tuning truth for Blaze Roller.
  * Values follow the design doc §11 with a few derived helpers added.
  * Systems must read from here rather than hard-coding numbers.
  */

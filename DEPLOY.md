@@ -1,4 +1,4 @@
-# Deploying Lava Temple Roll to Vercel
+# Deploying Blaze Roller to Vercel
 
 This is a static Vite + TypeScript app (Babylon.js). It builds to `dist/` and is
 served as static files — no server runtime needed.
@@ -31,7 +31,7 @@ The CLI reads `vercel.json`, runs `npm run build`, and uploads `dist/`.
 ```bash
 git init
 git add -A
-git commit -m "Lava Temple Roll"
+git commit -m "Blaze Roller"
 # create a repo on GitHub/GitLab/Bitbucket, add it as 'origin', then:
 git push -u origin main
 ```

@@ -42,8 +42,8 @@ export interface Theme {
 }
 
 export const ThemeConfig: Theme = {
-  id: "lava_temple",
-  displayName: "Lava Temple Roll",
+  id: "blaze_roller",
+  displayName: "Blaze Roller",
   colors: {
     background: "#090405",
     fog: "#180808",
