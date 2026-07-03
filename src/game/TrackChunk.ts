@@ -150,13 +150,19 @@ export class TrackChunk {
     segs[1].setEnabled(false);
   }
 
-  /** Place this chunk at a world Z and populate it from a pattern. */
+  /**
+   * Place this chunk at a world Z and populate it from a pattern. `minSpawnZ`
+   * (default -Infinity) suppresses any object whose world Z is below it — used at
+   * start/reset so the runway chunk laid BEHIND the ball has a solid surface but
+   * no idols/springs/hazards sitting behind or under the stationary ball.
+   */
   applyPattern(
     pattern: ChunkPattern,
     startZ: number,
     obstacles: ObstacleSystem,
     collectibles: CollectibleSystem,
-    springs: SpringSystem
+    springs: SpringSystem,
+    minSpawnZ = -Infinity
   ): void {
     this.startZ = startZ;
     this.root.position.z = startZ;
@@ -182,6 +188,7 @@ export class TrackChunk {
     if (pattern.obstacles) {
       for (const o of pattern.obstacles) {
         const wz = startZ + o.z;
+        if (wz < minSpawnZ) continue; // nothing behind the ball at start
         obstacles.spawn(o.type, laneToX(o.lane), wz, groundYAt(wz));
       }
     }
@@ -193,6 +200,7 @@ export class TrackChunk {
       let first = true;
       for (const s of pattern.springs) {
         const wz = startZ + s.z;
+        if (wz < minSpawnZ) continue; // nothing behind the ball at start
         // randomLane springs pop up anywhere; skip any lane holed by a gap at
         // this z so a spring never spawns floating over a hole.
         const lane = s.randomLane ? this.pickSpringLane(pattern, s.z) : s.lane;
@@ -208,6 +216,7 @@ export class TrackChunk {
     if (pattern.collectibles) {
       for (const c of pattern.collectibles) {
         const wz = startZ + c.z;
+        if (wz < minSpawnZ) continue; // no idols behind/under the ball at start
         // A followSpring coin traces the arc in whichever lane the spring popped.
         const lane = c.followSpring ? springLane : c.lane;
         // dy hints a gentle arc over a jump, but is kept LOW and capped so a

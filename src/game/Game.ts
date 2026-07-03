@@ -31,6 +31,7 @@ import { AudioManager } from "./AudioManager";
 import { BallSkins, skinById } from "./Skins";
 import { BiomeManager } from "./BiomeManager";
 import { ThemeConfig } from "./ThemeConfig";
+import { YTGame } from "./YTGame";
 
 const MAX_DT = 1 / 20; // clamp delta to avoid spiral-of-death on tab return
 
@@ -59,8 +60,15 @@ export class Game {
   private readonly ui: UIManager;
   private readonly save: SaveManager;
   private readonly audio: AudioManager;
+  private readonly ytg: YTGame;
 
   private state: GameState = GameState.Boot;
+
+  // YouTube-owned hard pause (onPause/onResume). Independent of the game-state
+  // machine: YouTube can pause on the menu or game-over too, and it must halt
+  // EVERYTHING — loop, audio, rendering — until onResume.
+  private sdkPaused = false;
+  private renderLoopRunning = false;
 
   // Juice: hit-stop timer freezes simulation briefly for impact.
   private hitStopTimer = 0;
@@ -139,6 +147,7 @@ export class Game {
     this.ui = new UIManager(hud);
     this.save = new SaveManager();
     this.audio = new AudioManager();
+    this.ytg = new YTGame();
 
     // Equip the player's saved skin.
     this.ball.applySkin(skinById(this.save.equipped));
@@ -213,19 +222,106 @@ export class Game {
     window.addEventListener("resize", () => this.onResize());
     this.onResize();
 
-    // Pause on focus/visibility loss (design doc §2 / §10).
+    // Last-chance save on reload/close/tab-hide so no progress is lost across
+    // reloads. pagehide fires on reload + navigation + bfcache; visibilitychange
+    // (hidden) is the reliable mobile-background signal. Both just flush the save.
+    window.addEventListener("pagehide", () => void this.save.flush());
     document.addEventListener("visibilitychange", () => {
-      if (document.hidden) this.pause();
-      else this.resume();
+      if (document.hidden) void this.save.flush();
     });
-    window.addEventListener("blur", () => this.pause());
-    window.addEventListener("focus", () => this.resume());
+
+    if (this.ytg.available) {
+      // Whenever the YouTube SDK is present (production AND the QA test suite,
+      // where IN_PLAYABLES_ENV can be false but the host still sends pause/mute
+      // events), the platform is the SOLE pause authority — the game MUST NOT use
+      // the Page Visibility API. Pause/resume, mute, and save are SDK-driven.
+      this.ytg.onPause(() => this.sdkPause());
+      this.ytg.onResume(() => this.sdkResume());
+      // Audio follows the YouTube mute setting: initialize + subscribe to changes.
+      this.audio.setMuted(!this.ytg.isAudioEnabled());
+      this.ytg.onAudioEnabledChange((on) => this.audio.setMuted(!on));
+    } else {
+      // Standalone (dev / Vercel) with no SDK: keep the web-visibility pause so
+      // switching tabs still behaves well when there's no host to pause us.
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) this.pause();
+        else this.resume();
+      });
+      window.addEventListener("blur", () => this.pause());
+      window.addEventListener("focus", () => this.resume());
+    }
   }
 
-  start(): void {
+  /**
+   * YouTube hard pause (onPause). Halts EVERYTHING — render loop, simulation,
+   * audio — and saves progress (SDK SHOULD-save-on-pause). Independent of the
+   * game-state machine so it works on the menu / game-over too.
+   */
+  private sdkPause(): void {
+    if (this.sdkPaused) return;
+    this.sdkPaused = true;
+    this.stopRenderLoop();
+    this.audio.suspend();
+    // Flush (not just queue) the save so an in-flight write has the best chance
+    // to land before a reload/teardown that may follow the pause.
+    void this.save.flush();
+  }
+
+  /** YouTube resume (onResume): restart the loop + audio, no dt spike. */
+  private sdkResume(): void {
+    if (!this.sdkPaused) return;
+    this.sdkPaused = false;
+    this.audio.resumeCtx();
+    this.lastTime = performance.now(); // avoid a huge dt on the first frame back
+    this.startRenderLoop();
+  }
+
+  private startRenderLoop(): void {
+    if (this.renderLoopRunning) return;
+    this.renderLoopRunning = true;
+    this.engine.runRenderLoop(() => this.frame());
+  }
+
+  private stopRenderLoop(): void {
+    if (!this.renderLoopRunning) return;
+    this.renderLoopRunning = false;
+    this.engine.stopRenderLoop();
+  }
+
+  async start(): Promise<void> {
     this.enterReady();
     this.lastTime = performance.now();
-    this.engine.runRenderLoop(() => this.frame());
+
+    // Render one frame so the first pixels are on screen, then tell YouTube the
+    // first frame is ready (the game boots straight into an interactive Ready
+    // screen — there is no separate loading gate).
+    this.sceneMgr.scene.render();
+    this.ytg.signalFirstFrameReady();
+
+    // Pull cloud-saved progress (best / idols / owned+equipped skin) before we
+    // announce readiness, so the equipped skin and wallet reflect the account.
+    await this.save.hydrate(this.ytg);
+    this.ball.applySkin(skinById(this.save.equipped));
+    this.refreshSkinUI();
+
+    // Now interactive with correct state — announce game-ready and run the loop.
+    this.ytg.signalGameReady();
+    this.startRenderLoop();
+  }
+
+  /** Debug: YouTube-SDK integration state (for automated verification). */
+  debugSdkState(): Record<string, unknown> {
+    return {
+      inPlayables: this.ytg.inPlayables,
+      available: this.ytg.available,
+      sdkPaused: this.sdkPaused,
+      renderLoopRunning: this.renderLoopRunning,
+      muted: this.audio.isMuted,
+      state: this.state,
+      best: this.save.best,
+      idols: this.save.idols,
+      equipped: this.save.equipped,
+    };
   }
 
   /**
@@ -344,6 +440,15 @@ export class Game {
     return this.collectibles
       .debugActiveHeights((z) => this.track.getTrackHeightAt(z))
       .map((h) => Number(h.toFixed(2)));
+  }
+
+  /** Debug: active collectible Zs + the ball Z (for behind-the-ball checks). */
+  debugStartLayout(): Record<string, unknown> {
+    return {
+      ballZ: Number(this.ball.position.z.toFixed(2)),
+      collectibleZs: this.collectibles.debugActiveZs(),
+      obstacleZs: this.obstacles.debugActiveZs(),
+    };
   }
 
   private frame(): void {
@@ -681,6 +786,8 @@ export class Game {
     const isNewBest = this.save.submit(finalScore);
     // Bank this run's idols into the persistent wallet (spendable on skins).
     this.save.addIdols(this.coins);
+    // Submit the run to the YouTube leaderboard (no-op outside Playables).
+    this.ytg.sendScore(finalScore);
     this.ui.showGameOver(finalScore, this.coins, this.save.best, isNewBest);
     this.refreshSkinUI();
     this.audio.duckMusic();
@@ -715,6 +822,7 @@ export class Game {
   }
 
   dispose(): void {
+    this.ytg.dispose();
     this.input.dispose();
     this.effects.dispose();
     this.audio.dispose();

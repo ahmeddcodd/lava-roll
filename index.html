@@ -8,6 +8,10 @@
     />
     <meta name="theme-color" content="#090405" />
     <title>Lava Temple Roll</title>
+    <!-- YouTube Playables SDK. MUST load before any game code so window.ytgame
+         exists when the game boots. Absent outside YouTube (dev/Vercel) — the
+         YTGame wrapper degrades every call to a safe no-op there. -->
+    <script src="https://www.youtube.com/game_api/v1"></script>
   </head>
   <body>
     <div id="app">

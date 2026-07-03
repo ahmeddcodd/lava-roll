@@ -110,6 +110,13 @@ export class CollectibleSystem {
     return ys;
   }
 
+  /** Debug: world Z of every active collectible (for behind-the-ball checks). */
+  debugActiveZs(): number[] {
+    const zs: number[] = [];
+    for (const c of this.pool) if (c.active) zs.push(Number(c.mesh.position.z.toFixed(2)));
+    return zs;
+  }
+
   /** Debug: {y, groundY-relative height} pairs for active coins near a Z. */
   debugActiveHeights(groundYAt: (z: number) => number): number[] {
     const out: number[] = [];

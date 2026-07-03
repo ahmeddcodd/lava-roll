@@ -71,6 +71,10 @@ export class TrackManager {
     this.chunksSpawned = 0;
     this.lastPatternId = "";
     let z = -GameConfig.track.chunkLength; // one chunk behind the ball
+    // The ball starts stationary at z=0. Suppress any object (idol/spring/hazard)
+    // at or behind it plus a small clear zone just ahead, so nothing sits behind
+    // or under the ball on the start screen. The track surface still lays fully.
+    const minSpawnZ = GameConfig.gameplay.startClearZ;
     for (const chunk of this.chunks) {
       chunk.setEnabled(true);
       chunk.applyPattern(
@@ -78,7 +82,8 @@ export class TrackManager {
         z,
         this.obstacles,
         this.collectibles,
-        this.springs
+        this.springs,
+        minSpawnZ
       );
       z += chunk.length;
     }

@@ -298,6 +298,13 @@ export class ObstacleSystem {
     for (const o of this.movers) if (o.active) fn(o);
   }
 
+  /** Debug: world Z of every active obstacle (for behind-the-ball checks). */
+  debugActiveZs(): number[] {
+    const zs: number[] = [];
+    this.forEachActive((o) => zs.push(Number(o.mesh.position.z.toFixed(2))));
+    return zs;
+  }
+
   /** Sphere-vs-AABB: returns squared distance from sphere center to the box. */
   static distanceSqToBox(center: Vector3, o: ActiveObstacle): number {
     const bx = o.mesh.position.x;

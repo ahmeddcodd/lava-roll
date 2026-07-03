@@ -106,6 +106,11 @@ export const GameConfig = {
   },
 
   gameplay: {
+    // Objects (idols/springs/hazards) at a world Z below this are suppressed on
+    // the initial layout, so nothing sits behind or right under the stationary
+    // ball (which starts at z=0) on the start screen. The track surface still
+    // lays fully; only pickups/hazards in this zone are skipped.
+    startClearZ: 2,
     // First N chunks after (re)start contain no lethal hazards (tutorial safety).
     safeStartChunks: 2,
     // Chunks over which difficulty ramps from easy to max (drives pickPattern).

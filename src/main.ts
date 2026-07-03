@@ -5,7 +5,9 @@ const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
 const hud = document.getElementById("hud") as HTMLDivElement;
 
 const game = new Game(canvas, hud);
-game.start();
+// start() is async (renders the first frame, signals firstFrameReady, awaits any
+// YouTube cloud-save hydration, then signals gameReady + runs the loop).
+void game.start();
 
 // Debug handle for automated verification only (opt-in via ?debug). No effect
 // on normal play — the flag is never set in production URLs.

@@ -1,13 +1,15 @@
 /**
  * AudioManager — fully procedural audio via the Web Audio API. No external files
  * (keeps the bundle tiny, in keeping with the asset-free game). Provides one-shot
- * SFX and a looping, speed-reactive music bed. Mute state persists in localStorage.
+ * SFX and a looping, speed-reactive music bed.
+ *
+ * Mute is NOT persisted locally: inside YouTube the mute state is owned entirely
+ * by the platform (driven via the SDK's onAudioEnabledChange); standalone it just
+ * starts unmuted. No localStorage is used anywhere in the game.
  *
  * The AudioContext starts suspended in most browsers and must be resumed from a
  * user gesture — call resume() on the first pointer/key input.
  */
-const MUTE_KEY = "lavaTempleRoll.muted";
-
 type Wave = OscillatorType;
 
 export class AudioManager {
@@ -32,11 +34,8 @@ export class AudioManager {
   private readonly rootHz = 130.81; // C3
 
   constructor() {
-    try {
-      this.muted = localStorage.getItem(MUTE_KEY) === "1";
-    } catch {
-      this.muted = false;
-    }
+    // Starts unmuted; mute is driven live by the YouTube SDK when present.
+    this.muted = false;
   }
 
   /** Lazily create the context on first gesture; safe to call repeatedly. */
@@ -63,11 +62,25 @@ export class AudioManager {
     if (this.ctx.state === "suspended") void this.ctx.resume();
   }
 
+  /**
+   * Hard-suspend the whole audio clock (YouTube onPause). Freezes the music
+   * scheduler's audio output and all in-flight voices with no state loss —
+   * resumeCtx() picks up exactly where it left off. No-op if audio isn't up.
+   */
+  suspend(): void {
+    if (this.ctx && this.ctx.state === "running") void this.ctx.suspend();
+  }
+
+  /** Resume the audio clock after a hard suspend (YouTube onResume). */
+  resumeCtx(): void {
+    if (this.ctx && this.ctx.state === "suspended") void this.ctx.resume();
+  }
+
   get isMuted(): boolean {
     return this.muted;
   }
 
-  /** Toggle mute; persists. Returns the new muted state. */
+  /** Toggle mute. Returns the new muted state. */
   toggleMute(): boolean {
     this.setMuted(!this.muted);
     return this.muted;
@@ -75,11 +88,6 @@ export class AudioManager {
 
   setMuted(m: boolean): void {
     this.muted = m;
-    try {
-      localStorage.setItem(MUTE_KEY, m ? "1" : "0");
-    } catch {
-      /* ignore */
-    }
     if (this.master && this.ctx) {
       this.master.gain.setTargetAtTime(m ? 0 : 0.9, this.ctx.currentTime, 0.02);
     }
