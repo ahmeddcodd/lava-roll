@@ -120,6 +120,15 @@ export class SpringSystem {
       if (s.active) this.release(s);
     }
   }
+
+  /** Debug: X positions of active springs (for lane-variety verification). */
+  debugActiveXs(): number[] {
+    const xs: number[] = [];
+    for (const s of this.pool) {
+      if (s.active) xs.push(Number(s.mesh.position.x.toFixed(2)));
+    }
+    return xs;
+  }
 }
 
 const SQUASH_TIME = 0.28;

@@ -34,6 +34,9 @@ export class TrackManager {
   /** Number of chunks laid so far since (re)start — drives tutorial safety. */
   private chunksSpawned = 0;
 
+  /** Last pattern id laid, to avoid two identical chunks back-to-back. */
+  private lastPatternId = "";
+
   constructor(
     scene: Scene,
     sceneMgr: SceneManager,
@@ -66,6 +69,7 @@ export class TrackManager {
   /** Lay out the initial safe runway. Call on start/reset. */
   reset(): void {
     this.chunksSpawned = 0;
+    this.lastPatternId = "";
     let z = -GameConfig.track.chunkLength; // one chunk behind the ball
     for (const chunk of this.chunks) {
       chunk.setEnabled(true);
@@ -78,6 +82,13 @@ export class TrackManager {
       );
       z += chunk.length;
     }
+  }
+
+  /** Debug: total active gaps (holes) across all laid chunks. Should be 0. */
+  debugActiveGapCount(): number {
+    let n = 0;
+    for (const chunk of this.chunks) n += chunk.gaps.length;
+    return n;
   }
 
   /** Recycle any chunk that has scrolled behind the ball. */
@@ -102,22 +113,49 @@ export class TrackManager {
     return max;
   }
 
-  /** Choose a pattern by difficulty ramp, honoring the safe-start runway. */
+  /**
+   * Choose a pattern along an escalating difficulty ramp. Progress `p` runs 0→1
+   * over `rampChunks`; the unlocked ceiling rises with it, and selection is
+   * weighted toward the current target difficulty (with a floor so easier
+   * "breather" chunks still appear) rather than flat-random. Avoids repeating
+   * the previous pattern for variety.
+   */
   private pickPattern(): ChunkPattern {
     this.chunksSpawned++;
     if (this.chunksSpawned <= GameConfig.gameplay.safeStartChunks) {
-      return pick(SAFE_PATTERNS);
+      const p = pick(SAFE_PATTERNS);
+      this.lastPatternId = p.id;
+      return p;
     }
 
-    // Difficulty grows with distance travelled (chunks laid).
-    const maxDifficulty = Math.min(3, Math.floor(this.chunksSpawned / 6));
-    const candidates = ChunkPatterns.filter(
-      (p) => p.difficulty <= maxDifficulty
-    );
+    const progress = Math.min(1, this.chunksSpawned / GameConfig.gameplay.rampChunks);
+    const maxDifficulty = Math.min(4, 1 + Math.floor(progress * 4));
+    const target = progress * 4; // 0 → 4 across the ramp
 
-    // Bias slightly toward higher difficulty at range so it doesn't feel flat,
-    // but always keep the pool fair (every pattern leaves a safe lane).
-    return pick(candidates);
+    let candidates = ChunkPatterns.filter((p) => p.difficulty <= maxDifficulty);
+    // Prefer not to repeat the exact previous chunk (keep at least one option).
+    const nonRepeat = candidates.filter((p) => p.id !== this.lastPatternId);
+    if (nonRepeat.length > 0) candidates = nonRepeat;
+
+    // Weight each candidate by closeness to the target difficulty; the 0.15 floor
+    // keeps variety so it never feels like a single difficulty on repeat.
+    let total = 0;
+    const weights = candidates.map((p) => {
+      const w = 0.15 + Math.max(0, 1 - Math.abs(p.difficulty - target) * 0.6);
+      total += w;
+      return w;
+    });
+    let r = Math.random() * total;
+    let chosen = candidates[candidates.length - 1];
+    for (let i = 0; i < candidates.length; i++) {
+      r -= weights[i];
+      if (r <= 0) {
+        chosen = candidates[i];
+        break;
+      }
+    }
+    this.lastPatternId = chosen.id;
+    return chosen;
   }
 
   /**

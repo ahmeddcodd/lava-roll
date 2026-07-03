@@ -13,7 +13,7 @@ export type GameState = (typeof GameState)[keyof typeof GameState];
 /** Lane index: -1 left, 0 center, 1 right (design doc §14). */
 export type Lane = -1 | 0 | 1;
 
-export type ObstacleType = "block" | "pillar";
+export type ObstacleType = "block" | "pillar" | "barrier" | "mover";
 
 export interface ObstacleSpec {
   type: ObstacleType;
@@ -25,6 +25,14 @@ export interface ObstacleSpec {
 export interface CollectibleSpec {
   lane: number;
   z: number;
+  /** Optional extra height above the surface (for coin arcs over jumps). */
+  dy?: number;
+  /**
+   * If set, this coin ignores `lane` and spawns in the lane the pattern's
+   * (random-lane) spring actually chose this time, so a spring→coin arc always
+   * lines up no matter which lane the spring popped in.
+   */
+  followSpring?: boolean;
 }
 
 export interface GapSpec {
@@ -41,6 +49,8 @@ export interface BoostPadSpec {
 export interface SpringSpec {
   lane: number;
   z: number;
+  /** If set, spawn in a random lane at runtime (avoiding any gap at this z). */
+  randomLane?: boolean;
 }
 
 /** A reusable track-chunk template selected by difficulty (design doc §14). */

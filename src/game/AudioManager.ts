@@ -179,6 +179,16 @@ export class AudioManager {
     this.tone(1400, 0.1, { type: "sine", gain: 0.25, to: 2000 });
   }
 
+  /** Combo milestone: a bright two-note sparkle that climbs with the streak. */
+  combo(count = 0): void {
+    const semis = Math.min(count, 12);
+    const base = 784 * Math.pow(2, semis / 12); // G5 rising with combo
+    this.tone(base, 0.12, { type: "triangle", gain: 0.32, to: base * 1.25 });
+    this.later(0.08, () =>
+      this.tone(base * 1.5, 0.16, { type: "triangle", gain: 0.3, to: base * 1.9 })
+    );
+  }
+
   gameOver(): void {
     // Short descending three-note motif.
     const notes = [440, 330, 220];

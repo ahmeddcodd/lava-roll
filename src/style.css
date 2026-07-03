@@ -135,6 +135,90 @@ body {
   text-shadow: 0 0 16px rgba(255, 200, 60, 0.5), 0 2px 4px rgba(0, 0, 0, 0.6);
 }
 
+/* Combo multiplier indicator. Sits just under the top bar, centered, above the
+   transient message (18vh) so the two never overlap. Hidden below x2. */
+#hud-combo {
+  position: absolute;
+  top: clamp(64px, 10vh, 120px);
+  left: 50%;
+  transform: translateX(-50%) scale(0.6);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 0.95;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+#hud-combo.show {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+
+#hud-combo .combo-mult {
+  font-size: clamp(30px, 6vh, 58px);
+  font-weight: 700;
+  color: var(--ui-gold);
+  text-shadow: 0 0 18px rgba(255, 190, 40, 0.85), 0 3px 8px rgba(0, 0, 0, 0.85);
+}
+
+#hud-combo .combo-label {
+  font-size: clamp(10px, 1.6vh, 15px);
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ui-text);
+  opacity: 0.8;
+  margin-top: 0.15em;
+}
+
+/* Kick the indicator on each combo bump. */
+#hud-combo.pop .combo-mult {
+  animation: statpop 0.28s ease-out;
+}
+
+/* Translucent "JUMP!" burst on springs / gap leaps. Sits over the ball (lower-
+   middle) and rushes up-and-back as it fades, reading as forward launch motion.
+   Fully non-interactive and see-through so it never masks the track ahead. */
+#hud-jump {
+  position: absolute;
+  bottom: 24%;
+  left: 50%;
+  font-size: clamp(30px, 7.5vh, 78px);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(190, 240, 255, 0.9);
+  text-shadow: 0 0 26px rgba(120, 220, 255, 0.7), 0 3px 10px rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  transform: translate(-50%, 0) scale(0.7);
+  will-change: transform, opacity;
+}
+
+#hud-jump.go {
+  animation: jumpburst 0.62s cubic-bezier(0.15, 0.7, 0.3, 1) forwards;
+}
+
+/* Springs up from over the ball, drifting back into the distance as it fades —
+   an upward+forward whoosh. Peaks translucent, never fully opaque. */
+@keyframes jumpburst {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 20px) scale(0.6);
+  }
+  22% {
+    opacity: 0.75;
+    transform: translate(-50%, -18px) scale(1.08);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -110px) scale(0.72);
+  }
+}
+
 /* Center transient message ("SPEED UP!", "CLOSE CALL!"). Sits below the top
    bar (18vh) so it never collides with the score/idols stats. */
 #hud-message {

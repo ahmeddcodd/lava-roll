@@ -23,6 +23,8 @@ export class UIManager {
   private readonly distanceEl: HTMLElement;
   private readonly coinsEl: HTMLElement;
   private readonly coinsLabelEl: HTMLElement;
+  private readonly comboEl: HTMLElement;
+  private readonly jumpEl: HTMLElement;
   private readonly messageEl: HTMLElement;
   private readonly tutorialEl: HTMLElement;
   private readonly pausedEl: HTMLElement;
@@ -57,6 +59,8 @@ export class UIManager {
           <span class="hud-stat-value" id="hud-coins">0</span>
         </div>
       </div>
+      <div id="hud-combo"><span class="combo-mult">x2</span><span class="combo-label">COMBO</span></div>
+      <div id="hud-jump"></div>
       <div id="hud-message"></div>
       <div id="hud-tutorial">
         <span class="tut-text">${labels.tutorial}</span>
@@ -85,6 +89,8 @@ export class UIManager {
     this.distanceEl = this.byId("hud-distance");
     this.coinsEl = this.byId("hud-coins");
     this.coinsLabelEl = this.byId("hud-coins-label");
+    this.comboEl = this.byId("hud-combo");
+    this.jumpEl = this.byId("hud-jump");
     this.messageEl = this.byId("hud-message");
     this.tutorialEl = this.byId("hud-tutorial");
     this.pausedEl = this.byId("hud-paused");
@@ -129,6 +135,33 @@ export class UIManager {
     this.messageEl.textContent = text;
     this.messageEl.classList.add("show");
     this.messageTimer = seconds;
+  }
+
+  /** Show/update the combo multiplier indicator (hidden below x2). */
+  setCombo(_combo: number, mult: number): void {
+    if (mult > 1) {
+      const multEl = this.comboEl.querySelector(".combo-mult");
+      if (multEl) multEl.textContent = `x${mult}`;
+      this.comboEl.classList.add("show");
+      // Re-pop on each bump for a lively kick.
+      this.comboEl.classList.remove("pop");
+      void this.comboEl.offsetWidth;
+      this.comboEl.classList.add("pop");
+    } else {
+      this.comboEl.classList.remove("show");
+    }
+  }
+
+  /**
+   * Translucent "JUMP!" burst that rushes up-and-forward, selling the leap.
+   * Replays the CSS animation on each call (springs + gap jumps).
+   */
+  jump(text = "JUMP!"): void {
+    this.jumpEl.textContent = text;
+    this.jumpEl.classList.remove("go");
+    // Force reflow so the animation restarts even on rapid back-to-back jumps.
+    void this.jumpEl.offsetWidth;
+    this.jumpEl.classList.add("go");
   }
 
   /** Punch-scale a HUD stat ("coins" | "distance") when it changes. */
@@ -212,6 +245,7 @@ export class UIManager {
     this.distanceEl.textContent = "0";
     this.coinsEl.textContent = "0";
     this.coinsLabelEl.textContent = ThemeConfig.labels.collectible;
+    this.comboEl.classList.remove("show");
     this.messageEl.classList.remove("show");
     this.messageTimer = 0;
     this.hideGameOver();

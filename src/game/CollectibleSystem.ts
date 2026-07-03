@@ -103,6 +103,23 @@ export class CollectibleSystem {
     return collected;
   }
 
+  /** Debug: world Y of every active collectible (for arc-height verification). */
+  debugActiveYs(): number[] {
+    const ys: number[] = [];
+    for (const c of this.pool) if (c.active) ys.push(c.mesh.position.y);
+    return ys;
+  }
+
+  /** Debug: {y, groundY-relative height} pairs for active coins near a Z. */
+  debugActiveHeights(groundYAt: (z: number) => number): number[] {
+    const out: number[] = [];
+    for (const c of this.pool) {
+      if (!c.active) continue;
+      out.push(c.mesh.position.y - groundYAt(c.mesh.position.z));
+    }
+    return out;
+  }
+
   /** Return all active collectibles to the pool (used on reset). */
   reset(): void {
     for (const c of this.pool) {

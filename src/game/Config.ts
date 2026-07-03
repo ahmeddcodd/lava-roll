@@ -30,11 +30,13 @@ export const GameConfig = {
     startSpeed: 16,
     acceleration: 0.35, // per second
     maxSpeed: 42,
-    steerSpeed: 22,
+    // Max lateral world-units/sec the ball may travel while steering. High enough
+    // that a fast cursor flick isn't throttled — the ball keeps up with the mouse.
+    steerSpeed: 40,
     // Steering responsiveness (per-second exponential smoothing rate). Higher =
-    // snappier/less lag. ~30 tracks the target position almost immediately while
-    // still removing raw-input jitter.
-    steerResponse: 30,
+    // snappier/less lag. High value tracks the pointer target almost immediately
+    // while still removing raw-input jitter.
+    steerResponse: 45,
     rollVisualMultiplier: 0.55,
     // Jump/air physics for coasting across gaps (values in world units).
     jump: {
@@ -72,6 +74,28 @@ export const GameConfig = {
     speedUpIntervalDistance: 250,
   },
 
+  // Combo / multiplier reward loop: chaining coin pickups + near-misses raises a
+  // multiplier that boosts score and escalates feedback. Decays if the chain
+  // stalls, and resets on any hit.
+  combo: {
+    timeout: 2.4, // seconds a chain survives without a new pickup/near-miss
+    maxMult: 5, // multiplier ceiling
+    step: 4, // combo hits per +1 multiplier (comboMult = 1 + floor(combo/step))
+    milestone: 5, // fire a celebratory beat every N combo hits
+  },
+
+  // Hazard tuning. The moving blocker oscillates side-to-side for tension; its
+  // amplitude stays under LATERAL_LIMIT so a fair lane is always reachable.
+  hazards: {
+    moverSpeed: 1.5, // rad/s of the side-to-side sweep
+    // World-x sweep. Capped at 1.7 (< one full lane) so a mover NEVER seals both
+    // far edges — a full-lane-wide escape always exists on at least one side.
+    moverAmplitude: 1.7,
+    // Distance (world units ahead of the ball) at which a hazard's warning rim
+    // begins to swell/pulse — the approach telegraph for high-speed readability.
+    telegraphRange: 15,
+  },
+
   camera: {
     portraitFov: 0.95,
     landscapeFov: 1.15,
@@ -84,6 +108,8 @@ export const GameConfig = {
   gameplay: {
     // First N chunks after (re)start contain no lethal hazards (tutorial safety).
     safeStartChunks: 2,
+    // Chunks over which difficulty ramps from easy to max (drives pickPattern).
+    rampChunks: 60,
     // Seconds the "DRAG TO STEER" hint stays up on first run.
     tutorialSeconds: 3,
     // Grace period (seconds) after leaving safe ground before falling triggers.

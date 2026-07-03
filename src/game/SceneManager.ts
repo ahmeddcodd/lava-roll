@@ -28,6 +28,7 @@ export class SceneManager {
   readonly matBallCrackGlow: StandardMaterial;
   readonly matGold: StandardMaterial;
   readonly matObstacle: StandardMaterial;
+  readonly matHazardRim: StandardMaterial;
   readonly matRuneBoost: StandardMaterial;
   readonly matBackgroundTemple: StandardMaterial;
   readonly matLaneLine: StandardMaterial;
@@ -94,10 +95,23 @@ export class SceneManager {
       specular: 0.4,
     });
 
-    this.matObstacle = this.makeMat("matObstacle", "#3a1c14", {
-      emissive: c.danger,
-      emissiveScale: 0.35,
+    // Hazard body: near-black charcoal so the silhouette reads as a solid mass
+    // against EVERY biome (red lava, pink candy, blue water), with a warm amber
+    // emissive glow (NOT pure red, which vanishes in the lava biome). Deliberately
+    // kept out of the BiomeManager so it never gets tinted to match the world.
+    this.matObstacle = this.makeMat("matObstacle", "#14100f", {
+      emissive: c.emberWarn,
+      emissiveScale: 0.6,
       specular: 0.1,
+    });
+
+    // Bright warning rim — an unlit, full-emissive warm-white edge stripe wrapped
+    // around every hazard. This is the universal "danger" read that pops against
+    // any background. Shared, never biome-tinted.
+    this.matHazardRim = this.makeMat("matHazardRim", c.hazardRim, {
+      emissive: c.hazardRim,
+      emissiveScale: 1.0,
+      disableLighting: true,
     });
 
     this.matRuneBoost = this.makeMat("matRuneBoost", c.lavaBright, {

@@ -15,6 +15,10 @@ export interface Theme {
     lavaBright: string;
     collectible: string;
     danger: string;
+    /** Hazard body emissive glow — a warm warning tone that contrasts every biome. */
+    emberWarn: string;
+    /** Hazard warning rim — bright warm-white edge stripe (universal danger read). */
+    hazardRim: string;
     uiMain: string;
     uiText: string;
     pillar: string;
@@ -49,6 +53,8 @@ export const ThemeConfig: Theme = {
     lavaBright: "#ffcc33",
     collectible: "#ffd447",
     danger: "#ff1f00",
+    emberWarn: "#ff8a1e",
+    hazardRim: "#ffe9b0",
     uiMain: "#ffb347",
     uiText: "#fff4d0",
     pillar: "#191214",

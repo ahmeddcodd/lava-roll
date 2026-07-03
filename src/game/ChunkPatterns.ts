@@ -2,21 +2,23 @@ import type { ChunkPattern } from "./types";
 
 /**
  * Reusable chunk templates (design doc §14). Z values are local to the chunk
- * (0 .. chunkLength). Lanes: -1 left, 0 center, 1 right.
- * Fairness rule: every hazardous pattern leaves at least one safe lane.
+ * (0 .. chunkLength = 15). Lanes: -1 left, 0 center, 1 right.
+ *
+ * Design rules for a satisfying, readable, consistent loop:
+ *  - The path is fully solid (no gaps/holes). Every hazardous pattern leaves at
+ *    least one clearly safe lane.
+ *  - Hazards start at z ≥ 4 (reaction room after the seam) and never sit closer
+ *    than ~4 units apart in z, so the player always has time to read + react.
+ *  - No coin shares a hazard's (lane, z) — reward is always reachable.
+ *  - Springs launch you into a coin arc; the arc coins use `followSpring` so they
+ *    line up with whichever (random) lane the spring popped in.
+ *  - Difficulty 0..4 escalates from pure coin runs to moving-hazard gauntlets
+ *    (the TrackManager ramp weights selection toward the current difficulty).
  */
 export const ChunkPatterns: ChunkPattern[] = [
+  // ---------- difficulty 0: warm-up, pure reward ----------
   {
-    id: "straight_safe",
-    difficulty: 0,
-    collectibles: [
-      { lane: 0, z: 4 },
-      { lane: 0, z: 7 },
-      { lane: 0, z: 10 },
-    ],
-  },
-  {
-    id: "coin_line",
+    id: "coin_river",
     difficulty: 0,
     collectibles: [
       { lane: 0, z: 3 },
@@ -27,41 +29,65 @@ export const ChunkPatterns: ChunkPattern[] = [
     ],
   },
   {
-    id: "left_right_blocks",
-    difficulty: 1,
-    obstacles: [
-      { type: "block", lane: -1, z: 6 },
-      { type: "block", lane: 1, z: 11 },
-    ],
+    id: "coin_zigzag",
+    difficulty: 0,
     collectibles: [
-      { lane: 0, z: 3 },
-      { lane: 1, z: 6 },
+      { lane: -1, z: 3 },
+      { lane: 0, z: 5 },
+      { lane: 1, z: 7 },
+      { lane: 0, z: 9 },
       { lane: -1, z: 11 },
+      { lane: 0, z: 13 },
     ],
   },
+
+  // ---------- difficulty 1: first hazards + generous reward ----------
   {
-    id: "risk_coin_edge",
+    // Single center barrier — drift to a side lane and collect there.
+    id: "barrier_swerve",
     difficulty: 1,
+    obstacles: [{ type: "barrier", lane: 0, z: 6 }],
     collectibles: [
       { lane: -1, z: 4 },
       { lane: -1, z: 6 },
-      { lane: 1, z: 9 },
-      { lane: 1, z: 11 },
+      { lane: -1, z: 8 },
+      { lane: 0, z: 11 },
+      { lane: 0, z: 13 },
     ],
   },
   {
-    id: "center_block_weave",
+    // Two side blocks on opposite lanes, staggered — weave center then out.
+    id: "left_right_blocks",
     difficulty: 1,
     obstacles: [
-      { type: "block", lane: 0, z: 5 },
-      { type: "block", lane: 0, z: 11 },
+      { type: "block", lane: -1, z: 5 },
+      { type: "block", lane: 1, z: 10 },
     ],
     collectibles: [
-      { lane: -1, z: 5 },
-      { lane: 1, z: 11 },
+      { lane: 0, z: 3 },
+      { lane: 1, z: 5 },
+      { lane: 0, z: 7.5 },
+      { lane: -1, z: 10 },
+      { lane: 0, z: 13 },
     ],
   },
   {
+    // Spring pops up in a random lane and flings you into a coin arc that
+    // follows that same lane, so the reward always lines up with the bounce.
+    id: "spring_hop",
+    difficulty: 1,
+    springs: [{ lane: 0, z: 4, randomLane: true }],
+    collectibles: [
+      { lane: 0, z: 7, dy: 0.9, followSpring: true },
+      { lane: 0, z: 9, dy: 1.6, followSpring: true },
+      { lane: 0, z: 11, dy: 1.6, followSpring: true },
+      { lane: 0, z: 13, dy: 0.8, followSpring: true },
+    ],
+  },
+
+  // ---------- difficulty 2: pillars, gem clusters, spring runs ----------
+  {
+    // Alternating side pillars — snake between them; coins in the open lane.
     id: "fire_pillars",
     difficulty: 2,
     obstacles: [
@@ -71,83 +97,165 @@ export const ChunkPatterns: ChunkPattern[] = [
     ],
     collectibles: [
       { lane: 1, z: 5 },
+      { lane: 0, z: 7 },
       { lane: -1, z: 9 },
+      { lane: 0, z: 11 },
       { lane: 1, z: 13 },
     ],
   },
   {
-    id: "split_gap",
+    // Pillar gate: two side pillars STAGGERED in z (not the same row), so you
+    // weave -1 → +1 with a full open lane at every moment — never a needle-thread.
+    id: "pillar_gate",
     difficulty: 2,
-    gaps: [{ lane: 0, zStart: 5, zEnd: 10 }],
-    collectibles: [
-      { lane: -1, z: 6 },
-      { lane: 1, z: 8 },
+    obstacles: [
+      { type: "pillar", lane: -1, z: 6 },
+      { type: "pillar", lane: 1, z: 10 },
     ],
-  },
-  {
-    id: "edge_gap_right",
-    difficulty: 3,
-    gaps: [{ lane: 1, zStart: 4, zEnd: 12 }],
-    obstacles: [{ type: "block", lane: -1, z: 8 }],
     collectibles: [
-      { lane: 0, z: 6 },
-      { lane: 0, z: 10 },
-    ],
-  },
-  {
-    id: "speed_pad",
-    difficulty: 1,
-    boostPads: [{ lane: 0, z: 4 }],
-    collectibles: [
-      { lane: 0, z: 7 },
-      { lane: 0, z: 9 },
-      { lane: 0, z: 11 },
+      { lane: 1, z: 6 },
+      { lane: 0, z: 8 },
+      { lane: -1, z: 10 },
       { lane: 0, z: 13 },
     ],
   },
   {
+    // Spring bounce straight into a rising coin arc (follows the spring lane).
+    id: "spring_arc",
+    difficulty: 2,
+    springs: [{ lane: 0, z: 4, randomLane: true }],
+    collectibles: [
+      { lane: 0, z: 7, dy: 1.2, followSpring: true },
+      { lane: 0, z: 9, dy: 1.8, followSpring: true },
+      { lane: 0, z: 11, dy: 1.4, followSpring: true },
+      { lane: 0, z: 13, dy: 0.8, followSpring: true },
+    ],
+  },
+  {
+    // Gem cluster reward in a side lane, guarded by one barrier in another lane.
+    id: "gem_cluster",
+    difficulty: 2,
+    obstacles: [{ type: "barrier", lane: -1, z: 8 }],
+    collectibles: [
+      { lane: 1, z: 6 },
+      { lane: 1, z: 7.2 },
+      { lane: 1, z: 8.4 },
+      { lane: 1, z: 9.6 },
+      { lane: 0, z: 12 },
+    ],
+  },
+
+  // ---------- difficulty 3: gauntlets, weaves, mixed hazards ----------
+  {
+    // Three blocks weaving center→left→right; coins in the freed lane each time.
+    id: "block_weave",
+    difficulty: 3,
+    obstacles: [
+      { type: "block", lane: 0, z: 4 },
+      { type: "block", lane: -1, z: 8 },
+      { type: "block", lane: 1, z: 12 },
+    ],
+    collectibles: [
+      { lane: -1, z: 4 },
+      { lane: 0, z: 6 },
+      { lane: 1, z: 8 },
+      { lane: 0, z: 10 },
+      { lane: -1, z: 12 },
+    ],
+  },
+  {
+    // Block then barrier on opposite sides — cut across the middle between them.
+    id: "block_barrier_mix",
+    difficulty: 3,
+    obstacles: [
+      { type: "block", lane: -1, z: 5 },
+      { type: "barrier", lane: 1, z: 10 },
+    ],
+    collectibles: [
+      { lane: 1, z: 5 },
+      { lane: 0, z: 7.5 },
+      { lane: -1, z: 10 },
+      { lane: 0, z: 13 },
+    ],
+  },
+  {
+    // Full gauntlet: barrier, pillar, block down the three lanes in turn.
     id: "gauntlet",
     difficulty: 3,
     obstacles: [
-      { type: "block", lane: -1, z: 4 },
+      { type: "barrier", lane: -1, z: 4 },
       { type: "pillar", lane: 1, z: 8 },
       { type: "block", lane: 0, z: 12 },
     ],
     collectibles: [
       { lane: 1, z: 4 },
+      { lane: 0, z: 6 },
       { lane: -1, z: 8 },
       { lane: 1, z: 12 },
     ],
   },
   {
-    // Bounce off the center spring and sail into the reward coins ahead.
-    id: "spring_hop",
-    difficulty: 1,
-    springs: [{ lane: 0, z: 5 }],
+    // Two springs (random lanes); reward between them and after the second.
+    id: "double_spring",
+    difficulty: 3,
+    springs: [
+      { lane: 0, z: 4, randomLane: true },
+      { lane: 0, z: 11, randomLane: true },
+    ],
     collectibles: [
-      { lane: 0, z: 9 },
-      { lane: 0, z: 11 },
-      { lane: 0, z: 13 },
+      { lane: 0, z: 7, dy: 1.6, followSpring: true },
+      { lane: 0, z: 8.5, dy: 1.2, followSpring: true },
+      { lane: -1, z: 13 },
+      { lane: 1, z: 13 },
+    ],
+  },
+
+  // ---------- difficulty 4: moving-hazard tension ----------
+  {
+    // Lone sweeping mover — read its swing, slip past on the open side.
+    id: "mover_solo",
+    difficulty: 4,
+    obstacles: [{ type: "mover", lane: 0, z: 8 }],
+    collectibles: [
+      { lane: -1, z: 4 },
+      { lane: -1, z: 5.5 },
+      { lane: 1, z: 11 },
+      { lane: 1, z: 12.5 },
     ],
   },
   {
-    // A spring set just before a gap so the bounce helps carry you across it.
-    id: "spring_gap",
-    difficulty: 2,
-    springs: [{ lane: 0, z: 4 }],
-    gaps: [{ lane: 0, zStart: 7, zEnd: 12 }],
+    // Mover center, with a side-lane coin run tempting you into its sweep path.
+    id: "mover_coin_run",
+    difficulty: 4,
+    obstacles: [{ type: "mover", lane: 0, z: 7 }],
     collectibles: [
+      { lane: -1, z: 3 },
+      { lane: -1, z: 5 },
       { lane: -1, z: 9 },
-      { lane: 1, z: 9 },
+      { lane: -1, z: 11 },
+      { lane: -1, z: 13 },
+    ],
+  },
+  {
+    // Mover early, static pillar late — reset your lane after the sweep.
+    id: "mover_pillars",
+    difficulty: 4,
+    obstacles: [
+      { type: "mover", lane: 0, z: 6 },
+      { type: "pillar", lane: -1, z: 12 },
+    ],
+    collectibles: [
+      { lane: 1, z: 4 },
+      { lane: 1, z: 12 },
+      { lane: 0, z: 14 },
     ],
   },
 ];
 
 /** Patterns guaranteed to contain no lethal hazards (used for tutorial start). */
 export const SAFE_PATTERN_IDS = new Set([
-  "straight_safe",
-  "coin_line",
-  "risk_coin_edge",
+  "coin_river",
+  "coin_zigzag",
   "spring_hop",
 ]);
 

@@ -12,6 +12,13 @@ import type { SpringSystem } from "./SpringSystem";
 
 const { chunkLength, chunkThickness, width } = GameConfig.track;
 
+// Coin placement heights. Base lift keeps idols pickable while rolling; arc
+// scale/cap flatten authored `dy` arcs so raised coins never occlude the hazard
+// they sit in front of (they hover just above head height at most).
+const COLLECTIBLE_BASE_DY = 0.6;
+const ARC_DY_SCALE = 0.4;
+const ARC_MAX_DY = 0.75;
+
 /**
  * A recyclable track segment. Built from three lane strips so individual lanes
  * can be hidden to form gaps (design doc §14 split_gap). Owns nothing pooled —
@@ -179,12 +186,37 @@ export class TrackChunk {
       }
     }
 
+    // Resolve springs FIRST so coin arcs can follow the spring's chosen lane.
+    // The first spring's lane drives any `followSpring` coins.
+    let springLane = 0;
+    if (pattern.springs) {
+      let first = true;
+      for (const s of pattern.springs) {
+        const wz = startZ + s.z;
+        // randomLane springs pop up anywhere; skip any lane holed by a gap at
+        // this z so a spring never spawns floating over a hole.
+        const lane = s.randomLane ? this.pickSpringLane(pattern, s.z) : s.lane;
+        if (first) {
+          springLane = lane;
+          first = false;
+        }
+        // Rest the pad flush on the slope surface (half its 0.28 height above).
+        springs.spawn(laneToX(lane), groundYAt(wz) + chunkThickness / 2 + 0.14, wz);
+      }
+    }
+
     if (pattern.collectibles) {
       for (const c of pattern.collectibles) {
         const wz = startZ + c.z;
+        // A followSpring coin traces the arc in whichever lane the spring popped.
+        const lane = c.followSpring ? springLane : c.lane;
+        // dy hints a gentle arc over a jump, but is kept LOW and capped so a
+        // string of raised coins never rises into the sightline and hides the
+        // hazard behind it. Coins read as "floating a little", not a wall.
+        const arc = Math.min(ARC_MAX_DY, (c.dy ?? 0) * ARC_DY_SCALE);
         collectibles.spawn(
-          laneToX(c.lane),
-          groundYAt(wz) + chunkThickness / 2 + 0.6,
+          laneToX(lane),
+          groundYAt(wz) + chunkThickness / 2 + COLLECTIBLE_BASE_DY + arc,
           wz
         );
       }
@@ -199,14 +231,19 @@ export class TrackChunk {
         pad.setEnabled(true);
       });
     }
+  }
 
-    if (pattern.springs) {
-      for (const s of pattern.springs) {
-        const wz = startZ + s.z;
-        // Rest the pad flush on the slope surface (half its 0.28 height above).
-        springs.spawn(laneToX(s.lane), groundYAt(wz) + chunkThickness / 2 + 0.14, wz);
-      }
+  /** Pick a random lane (-1/0/1) whose surface is solid at local z `sz`. */
+  private pickSpringLane(pattern: ChunkPattern, sz: number): number {
+    const open: number[] = [];
+    for (let lane = -1; lane <= 1; lane++) {
+      const holed = pattern.gaps?.some(
+        (g) => g.lane === lane && sz >= g.zStart && sz <= g.zEnd
+      );
+      if (!holed) open.push(lane);
     }
+    if (open.length === 0) return 0;
+    return open[(Math.random() * open.length) | 0];
   }
 
   private applyGap(g: GapSpec, startZ: number): void {

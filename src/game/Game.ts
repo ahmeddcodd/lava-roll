@@ -78,6 +78,12 @@ export class Game {
   private nextSpeedUpDistance: number = GameConfig.scoring.speedUpIntervalDistance;
   private boostTimer = 0;
 
+  // Combo reward loop: chained pickups + near-misses raise the multiplier.
+  private combo = 0;
+  private comboMult = 1;
+  private comboTimer = 0;
+  private nextComboMilestone: number = GameConfig.combo.milestone;
+
   private lastTime = 0;
 
   constructor(canvas: HTMLCanvasElement, hud: HTMLElement) {
@@ -104,7 +110,7 @@ export class Game {
     this.obstacles = new ObstacleSystem(
       scene,
       this.sceneMgr.matObstacle,
-      this.sceneMgr.matLava
+      this.sceneMgr.matHazardRim
     );
     this.collectibles = new CollectibleSystem(scene, this.sceneMgr.matGold);
     this.springs = new SpringSystem(scene, this.sceneMgr.matRuneBoost);
@@ -146,16 +152,18 @@ export class Game {
     this.collectibles.onCollect = (pos: Vector3) => {
       this.effects.collectBurst(pos);
       this.effects.ring(pos, "gold");
-      this.audio.collect(this.coins);
+      this.audio.collect(this.combo); // pitch rises with the streak
       this.ui.pop("coins");
     };
 
-    // Spring bounce: pop ring + jump SFX + a bit of camera kick and screen flash.
+    // Spring bounce: pop ring + jump SFX + a bit of camera kick and screen flash,
+    // plus the translucent forward-launch "JUMP!" text over the ball.
     this.springs.onBounce = (pos: Vector3) => {
       this.effects.ring(pos, "trail");
       this.audio.jump();
       this.camera.shake(0.25, 0.3);
       this.ui.flash("cyan");
+      this.ui.jump();
     };
 
     // First input starts the run and unlocks audio (needs a user gesture).
@@ -272,6 +280,68 @@ export class Game {
     this.springs.spawn(this.ball.position.x, this.track.getTrackHeightAt(z) + 0.14, z);
   }
 
+  /** Debug: total active gaps (holes) across the track — should be 0. */
+  debugGapCount(): number {
+    return this.track.debugActiveGapCount();
+  }
+
+  /** Debug: drop a mover just ahead of the ball for deterministic testing. */
+  debugSpawnMoverAhead(dz = 4): void {
+    const z = this.ball.position.z + dz;
+    this.obstacles.spawn("mover", 0, z, this.track.getTrackHeightAt(z));
+  }
+
+  /** Debug: line up one of each hazard type ahead of the ball (readability shot). */
+  debugSpawnHazardShowcase(): void {
+    const z0 = this.ball.position.z + 10;
+    const specs: Array<["block" | "pillar" | "barrier" | "mover", number, number]> = [
+      ["block", -2, z0],
+      ["pillar", 0, z0 + 4],
+      ["barrier", 2, z0 + 8],
+      ["mover", -2, z0 + 12],
+    ];
+    for (const [type, x, z] of specs) {
+      this.obstacles.spawn(type, x, z, this.track.getTrackHeightAt(z));
+    }
+  }
+
+  /** Debug: current combo state (for automated verification). */
+  debugComboState(): Record<string, unknown> {
+    return {
+      combo: this.combo,
+      comboMult: this.comboMult,
+      comboTimer: Number(this.comboTimer.toFixed(2)),
+      score: this.score,
+    };
+  }
+
+  /** Debug: snapshot of active obstacles (type + live position). */
+  debugObstacleSnapshot(): Array<Record<string, unknown>> {
+    const out: Array<Record<string, unknown>> = [];
+    this.obstacles.forEachActive((o) => {
+      out.push({
+        type: o.type,
+        x: Number(o.mesh.position.x.toFixed(2)),
+        y: Number(o.mesh.position.y.toFixed(2)),
+        z: Number(o.mesh.position.z.toFixed(2)),
+        isMover: o.isMover,
+      });
+    });
+    return out;
+  }
+
+  /** Debug: snapshot of active springs' lanes (x positions). */
+  debugSpringXs(): number[] {
+    return this.springs.debugActiveXs();
+  }
+
+  /** Debug: heights of active coins above their local ground (arc verification). */
+  debugCollectibleHeights(): number[] {
+    return this.collectibles
+      .debugActiveHeights((z) => this.track.getTrackHeightAt(z))
+      .map((h) => Number(h.toFixed(2)));
+  }
+
   private frame(): void {
     const now = performance.now();
     let dt = (now - this.lastTime) / 1000;
@@ -357,6 +427,7 @@ export class Game {
     this.boostTimer = 0;
     this.hitStopTimer = 0;
     this.nextSpeedUpDistance = GameConfig.scoring.speedUpIntervalDistance;
+    this.resetCombo();
 
     this.ball.reset();
     this.ball.stickToGround(this.track.getTrackHeightAt(0));
@@ -401,7 +472,7 @@ export class Game {
     this.speed = Math.min(GameConfig.player.maxSpeed, this.speed + accel * dt);
 
     // Move + steer (lateral + roll only; vertical handled below).
-    this.input.update();
+    this.input.update(dt);
     this.ball.update(dt, this.input.steerX, this.speed);
 
     // World streaming.
@@ -412,19 +483,29 @@ export class Game {
     this.environment.update(this.ball.position.z);
     this.effects.update(this.ball, dt);
 
-    // Collisions / falling / near-miss.
+    // Combo decays if the chain stalls (no pickup/near-miss within the window).
+    if (this.comboTimer > 0) {
+      this.comboTimer -= dt;
+      if (this.comboTimer <= 0) this.resetCombo();
+    }
+
+    // Collisions / falling / near-miss. Rewards scale with the combo multiplier.
     const res = this.collisions.check(this.ball);
     if (res.coinsCollected > 0) {
       this.coins += res.coinsCollected;
-      this.score += res.coinsCollected * GameConfig.scoring.coinValue;
+      this.bumpCombo(res.coinsCollected);
+      this.score +=
+        res.coinsCollected * GameConfig.scoring.coinValue * this.comboMult;
     }
     if (res.nearMiss) {
-      this.score += GameConfig.scoring.nearMissValue;
+      this.bumpCombo(1);
+      this.score += GameConfig.scoring.nearMissValue * this.comboMult;
       this.ui.flashMessage(ThemeConfig.labels.closeCall, 0.8);
       this.ui.flash("cyan");
       this.audio.closeCall();
     }
     if (res.hitObstacle) {
+      this.resetCombo();
       this.camera.shake(0.5, 0.4);
       this.ui.flash("red");
       this.audio.hit();
@@ -542,6 +623,7 @@ export class Game {
     if (this.state !== GameState.Playing) return;
     this.state = GameState.Falling;
     this.fallTimer = 0;
+    this.resetCombo();
     this.effects.stopAmbient();
     this.audio.fall();
     this.audio.duckMusic();
@@ -554,6 +636,39 @@ export class Game {
     this.camera.pulseFov();
     this.effects.speedPulse();
     this.audio.speedUp();
+  }
+
+  /** Extend the combo chain and recompute the multiplier. */
+  private bumpCombo(n: number): void {
+    const cfg = GameConfig.combo;
+    this.combo += n;
+    this.comboTimer = cfg.timeout;
+    this.comboMult = Math.min(cfg.maxMult, 1 + Math.floor(this.combo / cfg.step));
+    if (this.combo >= this.nextComboMilestone) {
+      this.nextComboMilestone += cfg.milestone;
+      this.onComboMilestone();
+    }
+    this.ui.setCombo(this.combo, this.comboMult);
+  }
+
+  /** Celebratory beat when the chain crosses a milestone. */
+  private onComboMilestone(): void {
+    this.effects.ring(this.ball.position, "gold");
+    this.camera.pulseFov();
+    this.camera.shake(0.12, 0.15);
+    this.ui.flash("gold");
+    this.ui.flashMessage(`x${this.comboMult} COMBO!`, 0.8);
+    this.effects.speedPulse();
+    this.audio.combo(this.combo);
+  }
+
+  /** Break the chain (miss timeout, hit, or run end). */
+  private resetCombo(): void {
+    this.combo = 0;
+    this.comboMult = 1;
+    this.comboTimer = 0;
+    this.nextComboMilestone = GameConfig.combo.milestone;
+    this.ui.setCombo(0, 1);
   }
 
   private endGame(): void {
